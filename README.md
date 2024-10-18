@@ -4,4 +4,4 @@ The package implements a weighted estimating equation approach based on a semipa
 
 The package has functions to calculate coefficients, robust standard error and p-value in Cox proportional hazard model. The data simulation model is also supported for users to create simulated clustered data up to arguments entered (lambda, b1, censrate, K, n, dimension) which satisfies Cox distribution.
 
-Now we are programming for the combination of C++ and R to improve its speed on processing huge datasets. File 'kernal.cpp' is the semi-finished code we are debugging.
+To achieve runtime efficiency similar to survival::coxph for the simulation of clustered survival data,  we are programming for the combination of C++ and R to improve its speed on processing huge datasets. File 'kernal.cpp' is the semi-finished code we are debugging.
