@@ -4,14 +4,20 @@
 \alias{init}
 \title{Initialize Data for Macrox Analysis}
 \usage{
-init(ad, div = NULL)
+init(ad, csvortxt = "txt", sep = "\\t", div = NULL)
 }
 \arguments{
 \item{ad}{The file path or data frame to analyze. If a file path is provided, the file will be loaded into a data frame.
 The file should be in a tabular format (e.g., .csv, .txt).}
 
-\item{div}{Integer. The number of observation points per sample. If provided, the data will be divided accordingly. Default is \code{NULL}.
+\item{csvortxt}{String. Specify the file type to be imported, either CSV or TXT. The default is TXT.}
+
+\item{sep}{parameter. The \code{sep} parameter specifies the character that separates
+the fields in each line of the file. For instance, for a comma-separated file, set \code{sep = ","},
+and for a tab-separated file, set \code{sep = "\t"}.
 If the data has complex observational situations, please preprocess the data before using this function.}
+
+\item{div}{Integer. The number of observation points per sample. If provided, the data will be divided accordingly. Default is \code{NULL}.}
 }
 \value{
 A list containing:

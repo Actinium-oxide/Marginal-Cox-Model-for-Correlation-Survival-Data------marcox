@@ -21,7 +21,7 @@
 #' The function ensures that the maximum observed time in both the control and treatment groups is checked for censoring.
 #' If the maximum time is not censored, it is forced to be censored to maintain the desired censoring rate.
 #' Users can also specify \code{result_data_length} to control the length of each dataset.
-#' After running the function, type \code{result_dde} in the R console to access all the generated datasets and relevant information.
+#' After running the function, type \code{datasets} in the R console to access all the generated datasets and relevant information.
 #' @examples
 #' # Generate datasets with 3 dimensions, 2 clusters, 100 samples per cluster
 #' gendat(dimension = 5, K = 100, n = 2, lambda = c(1, 2), b1 = log(2), theta = 8, censrate = 0.3,result_data_length=20)

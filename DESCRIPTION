@@ -8,7 +8,7 @@ Authors@R: c(
     person("Shida","Li",role = c("cre"),email="3039371588@qq.com"),
     person("Yi","Niu",role = c("aut"),email="niuyi@dlut.edu.cn"))
 Description: This package provides tools for estimating marginal hazard ratios in clustered failure time data. It implements a novel weighted estimating equation approach based on a semiparametric marginal proportional hazards model, accounting for within-cluster correlations. The package is designed for researchers in biostatistics and epidemiology who require accurate and efficient estimation methods for survival analysis in clustered data settings. Simulation functions, two real-world datasets including kidney infection dataset and diabetes dataset for demonstration purposes.
-Depends: R (>= 4.4.1),survival, Matrix
+Depends: R (>= 4.4.2), Matrix, MASS, survival
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.2
