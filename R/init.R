@@ -4,9 +4,14 @@
 #' It loads data from a specified file or data frame, performs basic preprocessing, and assigns unique identifiers for grouping.
 #' The function allows for simple clustering based on the \code{div} parameter, but if the data has more complex observational structures,
 #' users should preprocess the data before running this function.
+#'
 #' @param ad The file path or data frame to analyze. If a file path is provided, the file will be loaded into a data frame.
 #' The file should be in a tabular format (e.g., .csv, .txt).
 #' @param div Integer. The number of observation points per sample. If provided, the data will be divided accordingly. Default is \code{NULL}.
+#' @param csvortxt String. Specify the file type to be imported, either CSV or TXT. The default is TXT.
+#' @param sep parameter. The \code{sep} parameter specifies the character that separates
+#' the fields in each line of the file. For instance, for a comma-separated file, set \code{sep = ","},
+#' and for a tab-separated file, set \code{sep = "\t"}.
 #' If the data has complex observational situations, please preprocess the data before using this function.
 #' @return A list containing:
 #' \itemize{
@@ -25,14 +30,23 @@
 #' # Use an existing data frame without specifying div
 #' sample_data_1 <- kidney_data
 #' init(sample_data_1,div=2)
-init <- function(ad,div=NULL){
+init <- function(ad,csvortxt='txt',sep='\t',div=NULL){
   if(typeof(ad)=='character'){
-  cluster2 <<- read.table(ad,header=T)
-  }
+    if (csvortxt=='txt'){
+      cluster2 <<- read.table(ad,header=T,sep=sep)
+    }
+    else{
+      cluster2 <<- read.table(ad,header=T,sep=sep)
+    }
+    }
+
   else {cluster2<<-ad}
   col_name_origin=colnames(cluster2)
+
+
   if(is.null(div)==FALSE){
   if (dim(cluster2)[1]%%div!=0){ print ('ERROR IN DIVISION')}
+
   else{
     id<<-NULL
     l<<-dim(cluster2)[1]
@@ -64,13 +78,13 @@ init <- function(ad,div=NULL){
   else{
     id <<- cluster2[,'id']
     K<<-length(unique(id))
+    cluster2[,'original_id'] <<- id
+    col_num<<-dim(cluster2)[2]
+    cluster2_backup<<-cluster2
   }
   new_id<<-cluster2[,'id']
   new_uid<<-sort(unique(new_id))
   Kn<<- dim(cluster2)[1]
-  n<<- rep(0,length(new_uid))
-  for(i in 1:length(new_uid)){
-    n[i]<<- sum(id==i)
-  }
+
   return(list(cluster2,col_name_origin))
 }
