@@ -62,9 +62,8 @@
 #' @export
 marcox<-function(formula,dat,penalize=FALSE,pen_fla=3.7,pen_tp=30,weight_v=NULL){
 #preprocessing
-
-
-
+  new_id<<-cluster2[,'id']
+  new_uid<<-sort(unique(new_id))
 ############################
 #  penalizing       part   #
 ############################
@@ -733,17 +732,27 @@ RR=1
   betainit<<-matrix(rep(0,dim(xxx)[2]),ncol=1)
 
 
-
   ############################C++ Reserve############################
   if(TRUE){
     repeat{
-      gSS <<- rep(0,kk)
       gSS1 <<- rep(1,kk)
-      gSS[1]<<-dd[1]/(sum(g11[min((1:(Kn))[t11==tt1[1]]):(Kn)]*exp(x111[(min((1:(Kn))[t11==tt1[1]]):(Kn)),]%*%betainit)))
+      temp1<-sum(g11[min((1:(Kn))[t11==tt1[1]]):(Kn)]*exp(x111[(min((1:(Kn))[t11==tt1[1]]):(Kn)),]%*%betainit))
+      gSS <<- rep(1,kk)
+      #for(i in 1:kk-1){gSS[i+1]=1/(sum(g11[min((1:(Kn))[t11==tt1[i+1]]):(Kn)]*exp(x111[min((1:(Kn))[t11==tt1[i+1]]):(Kn),]%*%betainit)))}
+      gSS[1]<<-dd[1]/temp1
+      # mat_temp1<-matrix(0,kk,kk)
+      # mat_temp1[1,1]<-1
+      # for(i in 2:kk){
+      # mat_temp1[i,i] <- dd[i]
+      # mat_temp1[i-1,i]<-1
+      # }
+      # print(mat_temp1)
+
       for (i in 1:(kk-1))
       {
         gSS[i+1]<<-gSS[i]+dd[i+1]/(sum(g11[min((1:(Kn))[t11==tt1[i+1]]):(Kn)]*exp(x111[min((1:(Kn))[t11==tt1[i+1]]):(Kn),]%*%betainit)))
       }
+
       gSS1<<-exp(-gSS)
       gSS2<-rep(0,Kn)
       gSS3<-rep(0,Kn)
@@ -802,19 +811,39 @@ RR=1
         rho<<-(pphi^(-1))*rres/(sum(n*(n-1))/2-dim(X1)[2])
         SK=1
         repeat{
-          D1<<-diag(mu[id==1])%*%diag(rep(1,n[1]))%*%(X1[id==1,])
-          for(i in 2:K){
-            D1<<-rbind(D1,diag(mu[id==i])%*%diag(rep(1,n[i]))%*%(X1[id==i,])) }
-          S1<<-newY1-mu
-          R1<<-matrix(rho,n[1],n[1])
-          diag(R1)<<-1
-          V1<<-sqrt(diag(mu[id==1]))%*%R1%*%sqrt(diag(mu[id==1]))*pphi
-          for(i in 2:K)
-          {
-            R1<<-matrix(rho,n[i],n[i])
-            diag(R1)<<-1
-            V1<<-bdiag(V1,sqrt(diag(mu[id==i]))%*%R1%*%sqrt(diag(mu[id==i]))*pphi)
+          D1<<-matrix(0,Kn,1)
+          temp2=1
+          for(i in 1:K){
+            D1[temp2:(temp2+n[i]-1),]=diag(mu[id==i])%*%diag(rep(1,n[i]))%*%(X1[id==i,])
+            temp2=temp2+n[i]
           }
+
+          S1<<-newY1-mu
+          # D1<<-diag(mu[id==1])%*%diag(rep(1,n[1]))%*%(X1[id==1,])
+          # for(i in 2:K){
+          #   D1<<-rbind(D1,diag(mu[id==i])%*%diag(rep(1,n[i]))%*%(X1[id==i,])) }
+
+          R1<-matrix(rho,n[1],n[1])
+          diag(R1)<-1
+
+          V1<<-matrix(0,Kn,Kn)
+          temp3=1
+          for(i in 1:K){
+            R1<-matrix(rho,n[i],n[i])
+            diag(R1)<-1
+            V1[temp3:(temp3+n[i]-1),temp3:(temp3+n[i]-1)]<-sqrt(diag(mu[id==i]))%*%R1%*%sqrt(diag(mu[id==i]))*pphi
+            temp3=temp3+n[i]
+          }
+
+          # V1<<-sqrt(diag(mu[id==1]))%*%R1%*%sqrt(diag(mu[id==1]))*pphi
+          # for(i in 2:K)
+          # {
+          #   R1<-matrix(rho,n[i],n[i])
+          #   diag(R1)<-1
+          #   V1<<-bdiag(V1,sqrt(diag(mu[id==i]))%*%R1%*%sqrt(diag(mu[id==i]))*pphi)
+          # }
+
+
           V1<<-as.matrix(V1)
           Z1<<-D1%*%betainit+S1
           geebeta<<-solve(t(D1)%*%solve(V1)%*%W1%*%D1)%*%t(D1)%*%solve(V1)%*%W1%*%Z1
@@ -856,9 +885,8 @@ RR=1
   betascale<<-1
   be<<-betainit
   gS<<-c(gSS[1],gSS[2:kk]-gSS[1:(kk-1)])
-  gg1<<-rep(1,Kn)
   xxxx<<-xxx
-  z2<<-cbind(xxx)
+  z2<-xxx
   c2<<-c1
   mu2<<-exp(z2%*%betainit)
   ABC1<<-rep(0,K)
@@ -982,13 +1010,13 @@ RR=1
   naivv<<-V2
 
 
-  z=betainit/sandv
-  p_value<<-2*(1-pnorm(abs(z)))
+  z=betainit/sqrt(sandv)
+  p_value = 2 * (1 - pnorm(abs(z)))
   result<<-data.frame(
     x1=c(betainit),
     x2=c(exp(betainit)),
     x3=c(sqrt(sandv)),
-    x4=c(betainit/sqrt(sandv)),
+    x4=c(z),
     x5=c(p_value))
   colnames(result)<<-c('coef','exp(coef)','se(coef)','z','p')
   k=0
@@ -1008,7 +1036,6 @@ RR=1
   cat('Call:\n')
   print(match.call())
   print(result)
-
   }
   }
 

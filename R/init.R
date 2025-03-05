@@ -8,7 +8,6 @@
 #' @param ad The file path or data frame to analyze. If a file path is provided, the file will be loaded into a data frame.
 #' The file should be in a tabular format (e.g., .csv, .txt).
 #' @param div Integer. The number of observation points per sample. If provided, the data will be divided accordingly. Default is \code{NULL}.
-#' @param csvortxt String. Specify the file type to be imported, either CSV or TXT. The default is TXT.
 #' @param sep parameter. The \code{sep} parameter specifies the character that separates
 #' the fields in each line of the file. For instance, for a comma-separated file, set \code{sep = ","},
 #' and for a tab-separated file, set \code{sep = "\t"}.
@@ -30,8 +29,10 @@
 #' # Use an existing data frame without specifying div
 #' sample_data_1 <- kidney_data
 #' init(sample_data_1,div=2)
-init <- function(ad,csvortxt='txt',sep='\t',div=NULL){
+init <- function(ad,sep='\t',div=NULL){
   if(typeof(ad)=='character'){
+    cluster2 <<- read.table(ad,header=T,sep=sep)
+    if(F){
     if (csvortxt=='txt'){
       cluster2 <<- read.table(ad,header=T,sep=sep)
     }
@@ -39,6 +40,9 @@ init <- function(ad,csvortxt='txt',sep='\t',div=NULL){
       cluster2 <<- read.table(ad,header=T,sep=sep)
     }
     }
+}
+
+
 
   else {cluster2<<-ad}
   col_name_origin=colnames(cluster2)
