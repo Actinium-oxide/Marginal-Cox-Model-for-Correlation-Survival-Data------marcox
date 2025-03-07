@@ -1,4 +1,5 @@
 #' Generate Datasets for Cox Proportional Hazards Model Simulation
+#'
 #' @param dimension Integer. The number of datasets to be generated.
 #' @param K Integer. The number of samples within each cluster.
 #' @param n Integer. The number of clusters (groups) within each dataset.
@@ -7,7 +8,9 @@
 #' @param b1 Numeric. The regression coefficient for the covariate, affecting the hazard function.
 #' @param theta Numeric. A parameter that controls the dependence structure between survival times within clusters.
 #' @param censrate Numeric. The desired censoring rate for the dataset.
+#' @param binary Bool. If binary is True, covariate will be generated as binary, or continuous covariate will be generated.
 #' @param result_data_length Integer or NULL. If specified, truncates each dataset to the given number of rows.
+#'
 #' @return A list containing:
 #' \itemize{
 #'   \item \code{data} - A list of data frames, each containing a generated dataset.
@@ -24,10 +27,10 @@
 #' After running the function, type \code{datasets} in the R console to access all the generated datasets and relevant information.
 #' @examples
 #' # Generate datasets with 3 dimensions, 2 clusters, 100 samples per cluster
-#' gendat(dimension = 5, K = 100, n = 2, lambda = c(1, 2), b1 = log(2), theta = 8, censrate = 0.3,result_data_length=20)
+#' gendat(binary=F,dimension = 5, K = 100, n = 2, lambda = c(1, 2), b1 = log(2), theta = 8, censrate = 0.3,result_data_length=20)
 #' # Access the generated datasets
 #' datasets
-gendat<-function(dimension=10,K=30,n=2,lambda=c(1,2),b1=log(2),theta=5,censrate=0.5,result_data_length=NULL){
+gendat<-function(binary=T,dimension=10,K=30,n=2,lambda=c(1,2),b1=log(2),theta=5,censrate=0.5,result_data_length=NULL){
 datasets<<-list()
 censoringrates=rep(0,dimension)
 for(lll in 1:dimension){
@@ -35,7 +38,7 @@ for(lll in 1:dimension){
   x2=matrix(0,K,n)
   for(i in 1:K){
     u=runif(n)
-    x=rbinom(n,1,0.5)
+    if(binary){x=rbinom(n,1,0.5)}else{x=rnorm(n)}
     x2[i,]=x
     a=rep(0,n-1)
     tt[i,1]=(1/lambda[2])*(-exp(-b1*x[1])*log(1-u[1]))^(1/lambda[1])
@@ -51,7 +54,7 @@ for(lll in 1:dimension){
   {
     sum((x1*lambda[2]*exp(b1*xxx))^(-1)*(1-exp(-lambda[2]*exp(b1*xxx)*x1)))-y1*K*n
   }
-  cr<<-uniroot(f2, c(0.01,100),y1=censrate)$root
+  cr<<-uniroot(f2, c(0.01,10),y1=censrate)$root
   censor=runif(K*n,0,cr)
   c1=rep(0,K*n)
   t2=rep(0,K*n)

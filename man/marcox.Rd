@@ -2,7 +2,7 @@
 % Please edit documentation in R/marcox.R
 \name{marcox}
 \alias{marcox}
-\title{Macrox Analysis for Cox Proportional Hazards Models}
+\title{marcox Analysis for Cox Proportional Hazards Models}
 \usage{
 marcox(
   formula,
@@ -32,7 +32,7 @@ the function will incorporate a SCAD-type penalty using a Generalized Cross Vali
 \value{
 A data frame (if \code{penalize=FALSE}) or a list (if \code{penalize=TRUE}) containing the following components:
 \itemize{
-\item \strong{For the standard Macrox analysis (\code{penalize=FALSE})}:
+\item \strong{For the standard marcox analysis (\code{penalize=FALSE})}:
 \itemize{
 \item \code{coef} - The estimated regression coefficients.
 \item \code{exp(coef)} - The exponentiated coefficients (hazard ratios).
@@ -57,7 +57,7 @@ the overdispersion factor (\code{pphi}), and the number of iterations (\code{KK1
 }
 }
 \description{
-This function performs Macrox analysis for Cox proportional hazards models, incorporating clustered data
+This function performs marcox analysis for Cox proportional hazards models, incorporating clustered data
 and handling time-dependent covariates. It estimates coefficients, standard errors, and p-values based on
 the specified formula and dataset. In addition, an optional penalization functionality is provided via the
 \code{penalize} parameter. When \code{penalize} is set to TRUE, the function applies a SCAD-type penalty with

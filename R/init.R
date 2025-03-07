@@ -31,13 +31,13 @@
 #' init(sample_data_1,div=2)
 init <- function(ad,sep='\t',div=NULL){
   if(typeof(ad)=='character'){
-    cluster2 <<- read.table(ad,header=T,sep=sep)
+    cluster2 <- read.table(ad,header=T,sep=sep)
     if(F){
     if (csvortxt=='txt'){
-      cluster2 <<- read.table(ad,header=T,sep=sep)
+      cluster2 <- read.table(ad,header=T,sep=sep)
     }
     else{
-      cluster2 <<- read.table(ad,header=T,sep=sep)
+      cluster2 <- read.table(ad,header=T,sep=sep)
     }
     }
 }
@@ -55,9 +55,9 @@ init <- function(ad,sep='\t',div=NULL){
     id<<-NULL
     l<<-dim(cluster2)[1]
     col_n<<-dim(cluster2)[2]+1
-    cluster2[,'id'] <<- rep(1:l,each=div,length.out=(l%/%div)*div)
+    cluster2$id <- rep(1:l,each=div,length.out=(l%/%div)*div)
     id<<-cluster2[,'id']
-    cluster2[,'original_id'] <<- id
+    cluster2[,'original_id'] <- id
     col_num<<-dim(cluster2)[2]
     cluster2_backup<<-cluster2
     uid <<- sort(unique(id))
@@ -74,7 +74,7 @@ init <- function(ad,sep='\t',div=NULL){
         }
       }
     }
-    cluster2[,'id'] <<- newid
+    cluster2$id <- newid
     id <- cluster2[,'id']
     K<<-length(unique(id))
   }
@@ -82,13 +82,12 @@ init <- function(ad,sep='\t',div=NULL){
   else{
     id <<- cluster2[,'id']
     K<<-length(unique(id))
-    cluster2[,'original_id'] <<- id
+    cluster2[,'original_id'] <- id
     col_num<<-dim(cluster2)[2]
     cluster2_backup<<-cluster2
   }
-  new_id<<-cluster2[,'id']
-  new_uid<<-sort(unique(new_id))
   Kn<<- dim(cluster2)[1]
+  cluster2<-cluster2[order(cluster2$id),]
 
   return(list(cluster2,col_name_origin))
 }

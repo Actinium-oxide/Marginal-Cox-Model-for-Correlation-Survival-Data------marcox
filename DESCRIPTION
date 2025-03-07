@@ -1,7 +1,7 @@
 Package: marcox
 Type: Package
 Title: A Package for Marginal Hazard Ratio Estimation in Clustered Failure Time Data
-Version: 1.0.1
+Version: 1.0.0
 Authors@R: c(
     person("Junyi","Chen", role = c("aut"),email="ntldr2655088079@gmail.com"),
     person("Siqi","Zhou",role = c("aut"),email="564121231@qq.com"),

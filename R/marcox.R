@@ -1,6 +1,6 @@
-#' @title Macrox Analysis for Cox Proportional Hazards Models
+#' @title marcox Analysis for Cox Proportional Hazards Models
 #' @description
-#' This function performs Macrox analysis for Cox proportional hazards models, incorporating clustered data
+#' This function performs marcox analysis for Cox proportional hazards models, incorporating clustered data
 #' and handling time-dependent covariates. It estimates coefficients, standard errors, and p-values based on
 #' the specified formula and dataset. In addition, an optional penalization functionality is provided via the
 #' \code{penalize} parameter. When \code{penalize} is set to TRUE, the function applies a SCAD-type penalty with
@@ -18,7 +18,7 @@
 #'
 #' @return A data frame (if \code{penalize=FALSE}) or a list (if \code{penalize=TRUE}) containing the following components:
 #' \itemize{
-#'   \item \strong{For the standard Macrox analysis (\code{penalize=FALSE})}:
+#'   \item \strong{For the standard marcox analysis (\code{penalize=FALSE})}:
 #'     \itemize{
 #'       \item \code{coef} - The estimated regression coefficients.
 #'       \item \code{exp(coef)} - The exponentiated coefficients (hazard ratios).
@@ -61,9 +61,11 @@
 #'
 #' @export
 marcox<-function(formula,dat,penalize=FALSE,pen_fla=3.7,pen_tp=30,weight_v=NULL){
-#preprocessing
-  new_id<<-cluster2[,'id']
+  cluster2<<-dat[[1]]
+  new_id<<-cluster2$id
+  id<<-new_id
   new_uid<<-sort(unique(new_id))
+
 ############################
 #  penalizing       part   #
 ############################
@@ -655,9 +657,9 @@ RR=1
 
   else{
     if(T){
-      n<<- rep(0,length(new_uid))
-      for(i in 1:length(new_uid)){
-        n[i]<<- sum(id==i)
+      n<<- rep(0,K)
+      for(i in 1:K){
+        n[i]<<- sum(id==new_uid[i])
       }
       cluster2<<-dat[[1]]
       t2<<-cluster2[,as.character(formula[[2]][[2]])]
@@ -721,16 +723,15 @@ RR=1
       x111<<-as.matrix(xxx[order(t2),])
       rownames(x111)<<-rep(1:dim(x111)[1])
       xx1<<-x111[c11==1,]
-
+      SK1<<-1
       X1<<-xxx
       Kn_ls<<-1:Kn
     }
   n<<- rep(0,length(new_uid))
   for(i in 1:length(new_uid)){
-    n[i]<<- sum(id==i)
+    n[i]<<- sum(id==new_uid[i])
   }
   betainit<<-matrix(rep(0,dim(xxx)[2]),ncol=1)
-
 
   ############################C++ Reserve############################
   if(TRUE){
@@ -782,39 +783,70 @@ RR=1
       }
       Lambda<<-gSS3
       W1<<-diag(Lambda)
-      SK1=1
+
       beta1=matrix(rep(0,dim(xxx)[2]),ncol=1)
       repeat{
         mu<<-exp(X1%*%betainit)
         newY1<<-c1/Lambda
         res<<-as.vector((newY1-mu)/sqrt(mu))
         rres=0
+
+
+
         pphi<<-(sum(res^2)/(sum(n)-dim(X1)[2]))
-        resm=matrix(0,ncol=K,nrow=max(n))
-        for(i in 1:K)
-        {
-          resm[1:n[i],i]=res[id==i]
-        }
-        res<<-t(resm)
-        for(i in 1:K)
-        {
-          if(n[i]==1)
-          { rres=rres+res[i,1]
-          }
-          else
-          {
-            for(j in 1:(n[i]-1)){
-              rres=rres+res[i,j]*sum(res[i,(j+1):n[i]])
+
+
+
+
+        for(i in 1:K) {
+          group_res <- res[id == new_uid[i]]
+          ni <- length(group_res)
+          if(ni == 1) {
+            rres <- rres + group_res[1]
+          } else {
+            for(j in 1:(ni-1)) {
+              rres <- rres + group_res[j] * sum(group_res[(j+1):ni])
             }
           }
         }
+
+
+
+        # resm<<-matrix(0,ncol=K,nrow=max(n))
+        # for(i in 1:K)
+        # {
+        #   resm[1:n[i],i]<<-res[id==new_uid[i]]
+        # }
+        # res<<-t(resm)
+        # for(i in 1:K)
+        # {
+        #   if(n[i]==1)
+        #   { rres=rres+res[i,1]
+        #   }
+        #   else
+        #   {
+        #     for(j in 1:(n[i]-1)){
+        #       rres=rres+res[i,j]*sum(res[i,(j+1):n[i]])
+        #     }
+        #   }
+        # }
+
+
+
+
+
         rho<<-(pphi^(-1))*rres/(sum(n*(n-1))/2-dim(X1)[2])
+
+
+
         SK=1
         repeat{
-          D1<<-matrix(0,Kn,1)
+          D1<<-matrix(0,Kn,ncol(xxx))
           temp2=1
           for(i in 1:K){
-            D1[temp2:(temp2+n[i]-1),]=diag(mu[id==i])%*%diag(rep(1,n[i]))%*%(X1[id==i,])
+            id_eq=which(id==new_uid[i])
+            mu_gp=as.matrix(mu[id_eq])
+            D1[temp2:(temp2+n[i]-1),]<<-diag(as.vector(mu_gp)+1e-6)%*%diag(rep(1,n[i]))%*%(X1[id==new_uid[i],])
             temp2=temp2+n[i]
           }
 
@@ -823,41 +855,125 @@ RR=1
           # for(i in 2:K){
           #   D1<<-rbind(D1,diag(mu[id==i])%*%diag(rep(1,n[i]))%*%(X1[id==i,])) }
 
-          R1<-matrix(rho,n[1],n[1])
-          diag(R1)<-1
+          # R1<-matrix(rho,n[1],n[1])
+          # diag(R1)<-1
 
           V1<<-matrix(0,Kn,Kn)
           temp3=1
           for(i in 1:K){
+            id_eq=which(id==new_uid[i])
+            mu_gp=as.vector(mu[id_eq])
             R1<-matrix(rho,n[i],n[i])
             diag(R1)<-1
-            V1[temp3:(temp3+n[i]-1),temp3:(temp3+n[i]-1)]<-sqrt(diag(mu[id==i]))%*%R1%*%sqrt(diag(mu[id==i]))*pphi
+            V1[temp3:(temp3+n[i]-1),temp3:(temp3+n[i]-1)]<-sqrt(diag(pmax(mu_gp, 1e-8)))%*%R1%*%sqrt(diag(pmax(mu_gp, 1e-8)))*pphi
             temp3=temp3+n[i]
           }
 
-          # V1<<-sqrt(diag(mu[id==1]))%*%R1%*%sqrt(diag(mu[id==1]))*pphi
-          # for(i in 2:K)
-          # {
-          #   R1<-matrix(rho,n[i],n[i])
-          #   diag(R1)<-1
-          #   V1<<-bdiag(V1,sqrt(diag(mu[id==i]))%*%R1%*%sqrt(diag(mu[id==i]))*pphi)
-          # }
+
 
 
           V1<<-as.matrix(V1)
           Z1<<-D1%*%betainit+S1
-          geebeta<<-solve(t(D1)%*%solve(V1)%*%W1%*%D1)%*%t(D1)%*%solve(V1)%*%W1%*%Z1
+          sol_V1<<-mat_sol(V1)
+          t_D1=t(D1)
+          Z1<<-D1%*%betainit+S1
+          geebeta<<-mat_sol(t_D1%*%sol_V1%*%W1%*%D1,block=F)%*%t_D1%*%sol_V1%*%W1%*%Z1
+
+
+
+          # V1_inv <- matrix(0, nrow = Kn, ncol = Kn)
+          # temp3 <- 1
+          # for(i in 1:K) {
+          #   ni <- n[i]  # 第 i 个聚类的实际样本数
+          #   # 提取该聚类对应的 V1 子矩阵
+          #   V_block <- V1[temp3:(temp3 + ni - 1), temp3:(temp3 + ni - 1)]
+          #   # 加正则化，确保该块正定
+          #   V_block_reg <- V_block + diag(1e-5, ni)  # 1e-3 可根据实际情况调整
+          #   V_block_inv <<- tryCatch({
+          #     cholV <- chol(V_block_reg)
+          #     chol2inv(cholV)
+          #   }, error = function(e) {
+          #     MASS::ginv(V_block_reg)
+          #   })
+          #   V1_inv[temp3:(temp3 + ni - 1), temp3:(temp3 + ni - 1)] <- V_block_inv
+          #   temp3 <- temp3 + ni
+          # }
+          #
+          # t_D1 <- t(D1)
+          # lambda_reg <- 1e-5  # 正则化参数
+          # M <- t_D1 %*% V1_inv %*% W1 %*% D1 + diag(lambda_reg, ncol(D1))
+          # M_inv <- tryCatch({
+          #   solve(M)
+          # }, error = function(e) {
+          #   MASS::ginv(M)
+          # })
+          # Z1 <- D1 %*% betainit + S1
+          # geebeta <<- M_inv %*% (t_D1 %*% V1_inv %*% W1 %*% Z1)
+
+          # # 更新 betainit（建议同时结合步长控制）
+          # diff <- geebeta - betainit
+          # # 简单的阻尼更新（你也可以加入线搜索）
+          # alpha <- 0.5  # 阻尼因子
+          # betainit_new <- betainit + alpha * diff
+          # betainit <<- betainit_new
+          # mu <<- exp(X1 %*% betainit)
+
+
+
           if(any(abs(geebeta-betainit)>1e-6) && (SK<=500))
           {
-            betainit<<-geebeta
+
+
+            # # 计算 geebeta 已经完成，diff 为更新方向
+            # diff <- geebeta - betainit
+            #
+            # # 定义目标函数：例如以 newY1 和 mu = exp(X1 %*% beta) 的平方误差作为目标
+            # objective <- function(beta) {
+            #   mu_trial <- exp(X1 %*% beta)
+            #   sum((newY1 - mu_trial)^2)
+            # }
+            #
+            # obj_old <- objective(betainit)
+            #
+            # # 初始化步长 t = 1
+            # t <- 1
+            # max_line_iter <- 20
+            # found_decrease <- FALSE
+            # for(line_iter in 1:max_line_iter) {
+            #   beta_trial <- betainit + t * diff
+            #   obj_trial <- objective(beta_trial)
+            #   # 如果目标函数下降，则接受当前步长
+            #   if(obj_trial < obj_old) {
+            #     found_decrease <- TRUE
+            #     break
+            #   } else {
+            #     t <- t / 2
+            #   }
+            # }
+            # if(!found_decrease) {
+            #   # 若20次内均未找到下降步长，则取一个很小的步长
+            #   t <- 1e-3
+            # }
+            #
+            # # 更新 betainit（加入负号如果需要，取决于你的 geebeta 计算公式，此处假设 geebeta 已经包含方向信息）
+            # betainit <<- betainit + t * diff
+            # mu <<- exp(X1 %*% betainit)  # 更新 mu
+            #
+            # SK <<- SK + 1
+
+
+            betainit <<- geebeta
             mu<<-exp(X1%*%betainit)
             SK<<-SK+1
+
+
+
           }
           else break
         }
         if(any(abs(betainit-beta1)>0.000001) && (SK1<30))
         {
-          beta1<-betainit
+          beta1<<-betainit
           SK1<<-SK1+1
         }
         else break
@@ -901,17 +1017,17 @@ RR=1
         diag(Q1)<<-1
         IQ1<<-solve(Q1)
         B2<<-matrix(0,n[i],n[i])
-        z22<<-matrix(z2[id==i,],nrow=n[i],)
+        z22<<-matrix(z2[id==new_uid[i],],nrow=n[i],)
         A2<<-t(z22[,v])
-        c22<<-c2[id==i]
-        Lam22<<-Lambda[id==i]
-        mu22<<-mu2[id==i]
+        c22<<-c2[id==new_uid[i]]
+        Lam22<<-Lambda[id==new_uid[i]]
+        mu22<<-mu2[id==new_uid[i]]
         BB1<<-(mu22^(1/2))%*%((t(mu22))^(-1/2))*IQ1
         for(s in 1:n[i])
         {
           for(l in 1:n[i])
           {
-            B2[s,l]<-(1/2)*(z22[s,w]-z22[l,w])*BB1[s,l]
+            B2[s,l]<<-(1/2)*(z22[s,w]-z22[l,w])*BB1[s,l]
           }
         }
         C2<<-(c22/Lam22)-mu22
@@ -949,9 +1065,9 @@ RR=1
       elem=0
       for(i in 1:K)
       {
-        mu22=mu2[id==i]
-        xxx1=xxx[id==i,r]
-        t21=t2[id==i]
+        mu22=mu2[id==new_uid[i]]
+        xxx1=xxx[id==new_uid[i],r]
+        t21=t2[id==new_uid[i]]
 
         Q1=matrix(betacorr,n[i],n[i])
         diag(Q1)=1
@@ -974,21 +1090,21 @@ RR=1
   fdm<-0
   for(i in 1:K)
   {
-    xxx1=xxxx[id==i,]
-    gg11=gg1[id==i]
-    c111=c1[id==i]
-    t21=t2[id==i]
-    g11=Lambda[id==i]
-    z22=z2[id==i,]
-    mu22=mu2[id==i,]
+    xxx1=xxxx[id==new_uid[i],]
+    gg11=gg1[id==new_uid[i]]
+    c111=c1[id==new_uid[i]]
+    t21=t2[id==new_uid[i]]
+    g11=Lambda[id==new_uid[i]]
+    z22=z2[id==new_uid[i],]
+    mu22=mu2[id==new_uid[i],]
     mu22m=diag(mu22,n[i],n[i])
     G2=diag(g11)
-    c22=c2[id==i]
+    c22=c2[id==new_uid[i]]
     C2=(c22/g11)-mu22
     Q1=matrix(betacorr,n[i],n[i])
     diag(Q1)=1
     fdv<<-t(mu22m%*%z22)%*%solve(sqrt(mu22m)%*%Q1%*%sqrt(mu22m)*(betascale))%*%G2%*%C2
-    t22=t2[id==i]
+    t22=t2[id==new_uid[i]]
     eqalpha=rep(0,kk)
     for(j in 1:kk)
     {
@@ -1036,6 +1152,6 @@ RR=1
   cat('Call:\n')
   print(match.call())
   print(result)
+  cat('Correlation:', rho)
   }
   }
-
