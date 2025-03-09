@@ -5,6 +5,7 @@
 \title{Generate Datasets for Cox Proportional Hazards Model Simulation}
 \usage{
 gendat(
+  binary = T,
   dimension = 10,
   K = 30,
   n = 2,
@@ -16,6 +17,8 @@ gendat(
 )
 }
 \arguments{
+\item{binary}{Bool. If binary is True, covariate will be generated as binary, or continuous covariate will be generated.}
+
 \item{dimension}{Integer. The number of datasets to be generated.}
 
 \item{K}{Integer. The number of samples within each cluster.}
@@ -51,7 +54,7 @@ After running the function, type \code{datasets} in the R console to access all 
 }
 \examples{
 # Generate datasets with 3 dimensions, 2 clusters, 100 samples per cluster
-gendat(dimension = 5, K = 100, n = 2, lambda = c(1, 2), b1 = log(2), theta = 8, censrate = 0.3,result_data_length=20)
+gendat(binary=F,dimension = 5, K = 100, n = 2, lambda = c(1, 2), b1 = log(2), theta = 8, censrate = 0.3,result_data_length=20)
 # Access the generated datasets
 datasets
 }
