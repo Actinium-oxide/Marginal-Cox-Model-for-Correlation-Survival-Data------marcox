@@ -19,6 +19,7 @@
 #'   \item \code{col_name_origin} - The original column names of the data frame.
 #' }
 #' @export
+#' @importFrom utils read.table
 #' @details
 #' This function is generally used as a preparatory step for the \code{marcox} function.
 #' It handles loading and preprocessing data by setting up unique identifiers (`id`) based on the number of observation points specified by \code{div}.
@@ -32,19 +33,9 @@
 init <- function(ad,sep='\t',div=NULL){
   if(typeof(ad)=='character'){
     cluster2 <- read.table(ad,header=T,sep=sep)
-    if(F){
-    if (csvortxt=='txt'){
-      cluster2 <- read.table(ad,header=T,sep=sep)
-    }
-    else{
-      cluster2 <- read.table(ad,header=T,sep=sep)
-    }
-    }
+
 }
-
-
-
-  else {cluster2<<-ad}
+  else {cluster2<-ad}
   col_name_origin=colnames(cluster2)
 
 
@@ -52,16 +43,16 @@ init <- function(ad,sep='\t',div=NULL){
   if (dim(cluster2)[1]%%div!=0){ print ('ERROR IN DIVISION')}
 
   else{
-    id<<-NULL
-    l<<-dim(cluster2)[1]
-    col_n<<-dim(cluster2)[2]+1
+    id<-NULL
+    l<-dim(cluster2)[1]
+    col_n<-dim(cluster2)[2]+1
     cluster2$id <- rep(1:l,each=div,length.out=(l%/%div)*div)
-    id<<-cluster2[,'id']
+    id<-cluster2$id
     cluster2[,'original_id'] <- id
-    col_num<<-dim(cluster2)[2]
-    cluster2_backup<<-cluster2
-    uid <<- sort(unique(id))
-    newid <<- rep(0,length(id))
+    col_num<-dim(cluster2)[2]
+    cluster2_backup<-cluster2
+    uid <- sort(unique(id))
+    newid <- rep(0,length(id))
     for(i in 1:length(id)){
       j<-1
       repeat{
@@ -69,24 +60,22 @@ init <- function(ad,sep='\t',div=NULL){
           j<-j+1
         }
         else{
-          newid[i] <<- j
+          newid[i] <- j
           break
         }
       }
     }
     cluster2$id <- newid
-    id <- cluster2[,'id']
-    K<<-length(unique(id))
+
+
   }
   }
   else{
-    id <<- cluster2[,'id']
-    K<<-length(unique(id))
     cluster2[,'original_id'] <- id
-    col_num<<-dim(cluster2)[2]
-    cluster2_backup<<-cluster2
+    col_num<-dim(cluster2)[2]
+    cluster2_backup<-cluster2
   }
-  Kn<<- dim(cluster2)[1]
+
   cluster2<-cluster2[order(cluster2$id),]
 
   return(list(cluster2,col_name_origin))

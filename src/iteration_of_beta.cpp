@@ -93,7 +93,7 @@ List marcox_iterCpp(
             for(int k=j+1; k<ni; k++){
               tmp += groupRes[k];
             }
-            rres += groupRes[j]* ( /*sum from j+1..ni-1*/ (tmp - groupRes[j]) );
+            rres += groupRes[j]* ((tmp - groupRes[j]) );
           }
         }
       }

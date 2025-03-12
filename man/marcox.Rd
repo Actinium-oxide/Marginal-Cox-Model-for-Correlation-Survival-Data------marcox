@@ -2,58 +2,30 @@
 % Please edit documentation in R/marcox.R
 \name{marcox}
 \alias{marcox}
-\title{marcox Analysis for Cox Proportional Hazards Models}
+\title{Analysis for Cox Proportional Hazards Models}
 \usage{
-marcox(
-  formula,
-  dat,
-  penalize = FALSE,
-  pen_fla = 3.7,
-  pen_tp = 30,
-  weight_v = NULL
-)
+marcox(formula, dat)
 }
 \arguments{
 \item{formula}{A model formula that uses the \code{Surv()} function to define the survival outcome. It should include
-both continuous and categorical covariates, where categorical variables must be specified using the \code{factor()} function.}
+both continuous and categorical covariates, where categorical variables must be specified using the \code{factormar()} function.}
 
 \item{dat}{A list containing the dataset as prepared by the \code{init()} function. This list must include the processed data frame
 and original column names to ensure proper matching of variables.}
-
-\item{penalize}{A logical flag indicating whether penalization should be applied for variable selection. If set to \code{TRUE},
-the function will incorporate a SCAD-type penalty using a Generalized Cross Validation (GCV) criterion for tuning.}
-
-\item{pen_fla}{A numeric value representing the penalty factor used in the SCAD penalty. The default value is typically around 3.7.}
-
-\item{pen_tp}{An integer specifying the number of tuning parameter values to be evaluated in the penalization process.}
-
-\item{weight_v}{A numeric value or vector used to adjust the effect of the penalty during the optimization.}
 }
 \value{
 A data frame (if \code{penalize=FALSE}) or a list (if \code{penalize=TRUE}) containing the following components:
 \itemize{
-\item \strong{For the standard marcox analysis (\code{penalize=FALSE})}:
+\item \strong{For the standard marcox analysis}:
 \itemize{
 \item \code{coef} - The estimated regression coefficients.
 \item \code{exp(coef)} - The exponentiated coefficients (hazard ratios).
 \item \code{se(coef)} - The standard errors of the estimated coefficients.
 \item \code{z} - The z-statistics for testing the significance of the coefficients.
 \item \code{p} - The p-values associated with the coefficients.
+\item \code{Correlation]} - The correlation coefficient of the data.
 }
 
-\item \strong{For the penalized analysis (\code{penalize=TRUE})}:
-\itemize{
-\item \code{result_pen} - A data frame with columns:
-\itemize{
-\item \code{pp} - The penalized regression coefficients.
-\item \code{var} - The variance estimates of the penalized coefficients.
-\item \code{CIlow} - The lower bounds of the 95\% confidence intervals.
-\item \code{CIupp} - The upper bounds of the 95\% confidence intervals.
-}
-\item \code{npp} - A numeric vector containing additional diagnostics including the correlation parameter (\code{rho}),
-the overdispersion factor (\code{pphi}), and the number of iterations (\code{KK1}).
-\item \code{GCV} - A matrix of Generalized Cross Validation (GCV) values corresponding to the evaluated tuning parameters.
-}
 }
 }
 \description{
@@ -65,7 +37,7 @@ tuning parameter selection via a GCV criterion to perform variable selection.
 }
 \details{
 The \code{marcox()} function is specifically designed for survival data analysis using Cox proportional hazards models. It handles both clustered and time-dependent covariates effectively.
-The survival outcome must be defined using the \code{Surv()} function in the model formula, and covariates can be included directly or by converting categorical variables with the \code{factor()} function.
+The survival outcome must be defined using the \code{Surv()} function in the model formula, and covariates can be included directly or by converting categorical variables with the \code{factormar()} function.
 
 When the \code{penalize} parameter is enabled, the function applies a SCAD-type penalty to perform variable selection. A range of tuning parameters,
 determined by \code{pen_tp}, is evaluated via a GCV criterion to select the optimal penalty strength. This process helps in reducing model complexity by
@@ -73,11 +45,6 @@ shrinking insignificant coefficients toward zero.
 }
 \examples{
   dat <- init(kidney_data, div = 2)
-  formula <- Surv(time, cens) ~ sex + factor('type')
-  # Standard Macrox analysis without penalization (default)
+  formula <- Surv(time, cens) ~ sex + factormar('type', d_v=c(1,2,3))
   result1 <- marcox(formula, dat)
-
-  # Penalized analysis for variable selection
-  result2 <- marcox(formula, dat, penalize=TRUE, pen_fla=3.7, pen_tp=30, weight_v=1)
-
 }

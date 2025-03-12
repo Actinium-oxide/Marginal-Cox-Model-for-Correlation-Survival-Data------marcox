@@ -1,4 +1,4 @@
-#' @title marcox Analysis for Cox Proportional Hazards Models
+#' @title Analysis for Cox Proportional Hazards Models
 #' @description
 #' This function performs marcox analysis for Cox proportional hazards models, incorporating clustered data
 #' and handling time-dependent covariates. It estimates coefficients, standard errors, and p-values based on
@@ -7,45 +7,32 @@
 #' tuning parameter selection via a GCV criterion to perform variable selection.
 #'
 #' @param formula A model formula that uses the \code{Surv()} function to define the survival outcome. It should include
-#' both continuous and categorical covariates, where categorical variables must be specified using the \code{factor()} function.
+#' both continuous and categorical covariates, where categorical variables must be specified using the \code{factormar()} function.
 #' @param dat A list containing the dataset as prepared by the \code{init()} function. This list must include the processed data frame
 #' and original column names to ensure proper matching of variables.
-#' @param penalize A logical flag indicating whether penalization should be applied for variable selection. If set to \code{TRUE},
-#' the function will incorporate a SCAD-type penalty using a Generalized Cross Validation (GCV) criterion for tuning.
-#' @param pen_fla A numeric value representing the penalty factor used in the SCAD penalty. The default value is typically around 3.7.
-#' @param pen_tp An integer specifying the number of tuning parameter values to be evaluated in the penalization process.
-#' @param weight_v A numeric value or vector used to adjust the effect of the penalty during the optimization.
 #' @useDynLib marcox, .registration = TRUE
 #' @importFrom Rcpp evalCpp
+#' @import RcppEigen
+#' @import Matrix
+#' @import survival
 #' @return A data frame (if \code{penalize=FALSE}) or a list (if \code{penalize=TRUE}) containing the following components:
 #' \itemize{
-#'   \item \strong{For the standard marcox analysis (\code{penalize=FALSE})}:
+#'   \item \strong{For the standard marcox analysis}:
 #'     \itemize{
 #'       \item \code{coef} - The estimated regression coefficients.
 #'       \item \code{exp(coef)} - The exponentiated coefficients (hazard ratios).
 #'       \item \code{se(coef)} - The standard errors of the estimated coefficients.
 #'       \item \code{z} - The z-statistics for testing the significance of the coefficients.
 #'       \item \code{p} - The p-values associated with the coefficients.
+#'       \item \code{Correlation]} - The correlation coefficient of the data.
 #'     }
 #'
-#'   \item \strong{For the penalized analysis (\code{penalize=TRUE})}:
-#'     \itemize{
-#'       \item \code{result_pen} - A data frame with columns:
-#'         \itemize{
-#'           \item \code{pp} - The penalized regression coefficients.
-#'           \item \code{var} - The variance estimates of the penalized coefficients.
-#'           \item \code{CIlow} - The lower bounds of the 95% confidence intervals.
-#'           \item \code{CIupp} - The upper bounds of the 95% confidence intervals.
-#'         }
-#'       \item \code{npp} - A numeric vector containing additional diagnostics including the correlation parameter (\code{rho}),
-#'             the overdispersion factor (\code{pphi}), and the number of iterations (\code{KK1}).
-#'       \item \code{GCV} - A matrix of Generalized Cross Validation (GCV) values corresponding to the evaluated tuning parameters.
-#'     }
+#'
 #' }
 #'
 #' @details
 #' The \code{marcox()} function is specifically designed for survival data analysis using Cox proportional hazards models. It handles both clustered and time-dependent covariates effectively.
-#' The survival outcome must be defined using the \code{Surv()} function in the model formula, and covariates can be included directly or by converting categorical variables with the \code{factor()} function.
+#' The survival outcome must be defined using the \code{Surv()} function in the model formula, and covariates can be included directly or by converting categorical variables with the \code{factormar()} function.
 #'
 #' When the \code{penalize} parameter is enabled, the function applies a SCAD-type penalty to perform variable selection. A range of tuning parameters,
 #' determined by \code{pen_tp}, is evaluated via a GCV criterion to select the optimal penalty strength. This process helps in reducing model complexity by
@@ -53,30 +40,21 @@
 #'
 #' @examples
 #'   dat <- init(kidney_data, div = 2)
-#'   formula <- Surv(time, cens) ~ sex + factor('type')
-#'   # Standard Macrox analysis without penalization (default)
+#'   formula <- Surv(time, cens) ~ sex + factormar('type', d_v=c(1,2,3))
 #'   result1 <- marcox(formula, dat)
-#'
-#'   # Penalized analysis for variable selection
-#'   result2 <- marcox(formula, dat, penalize=TRUE, pen_fla=3.7, pen_tp=30, weight_v=1)
-#'
 #' @export
-marcox<-function(formula,dat,penalize=FALSE,pen_fla=3.7,pen_tp=30,weight_v=NULL){
-  cluster2<<-dat[[1]]
-  new_id<<-cluster2$id
-  id<<-new_id
-  new_uid<<-sort(unique(new_id))
-
-
-
-if(penalize) {cat('Not available\n')}
-  else{
-    if(T){
-      n<<- rep(0,K)
+marcox<-function(formula,dat){
+  cluster2<-dat[[1]]
+  col_num<-dim(cluster2)[2]
+  new_id<-cluster2$id
+  id<-new_id
+  new_uid<-sort(unique(new_id))
+  K<-length(unique(id))
+  Kn<- dim(cluster2)[1]
+      n<- rep(0,K)
       for(i in 1:K){
-        n[i]<<- sum(id==new_uid[i])
+        n[i]<- sum(id==new_uid[i])
       }
-      cluster2<<-dat[[1]]
       t2<-cluster2[,as.character(formula[[2]][[2]])]
       c1<-cluster2[,as.character(formula[[2]][[3]])]
       Y1<-matrix(cluster2[,as.character(formula[[2]][[3]])],ncol=1)
@@ -99,30 +77,47 @@ if(penalize) {cat('Not available\n')}
       index<-strsplit(col_origin_1,'\\+')[[1]]
       cov_temp<-c()
       xxx_1<-c()
-      xxx_2<-c()
-      xxx_21=c()
+      xxx_21=matrix(0,Kn,1)
       for (i in 1:length(index)){index[i]<-gsub(' ','',index[i])}
       for (j in index){
-        if (grepl('factor',j)==FALSE){cov_temp<-c(cov_temp,j)}
+        if (grepl('factormar\\(',j)==FALSE){cov_temp<-c(cov_temp,j)}
         else{
-          tm=eval(parse(text=j))
+          para=gsub(' ','',j)
+          para=gsub('factormar\\(','',para)
+          para=gsub('typename=','',para)
+          para=gsub('d_v=','',para)
+          if(grepl('c\\(',para)){
+            d_vec <- substring(para,first = regexpr('c\\(',para)[[1]],last = nchar(para)-1)
+            typenm <- substring(para,first=2,last =  regexpr('c\\(',para)[[1]]-3)
+            factorls <- list(typename=typenm,d_v=d_vec,cluster22=cluster2)
+          }else{
+            para=substring(para,first = 2,last = nchar(para)-2)
+            factorls=list(typename=para,cluster22=cluster2)
+          }
+          tm=do.call(factormar,factorls)
+          #tm=eval(parse(text=j))
           tm_1=tm[[1]]
           typelist<-c(typelist,tm_1[1])
           typedumlist<-c(typedumlist,tm_1[2:length(tm_1)])
-        }}
-      for (i in index){
-        if(grepl('factor',i)==TRUE){
-          tm_2=eval(parse(text=i))[[2]]
-          xxx_21<-c(xxx_21,tm_2)
-        }
-      }
-      for (i in 1:length(xxx_21)){
-        xxx_2<-cbind(xxx_2,xxx_21[[i]])
-      }
-      if(is.null(cov_temp)==FALSE){xxx_1 <- as.matrix(cluster2[,cov_temp[1]])
 
-      if (length(cov_temp)>=2){
-        for (i in 2:length(cov_temp)){
+          tm_2 <- do.call(factormar,factorls)[[2]]
+          xxx_21<-cbind(xxx_21,tm_2)
+        }}
+      xxx_21=xxx_21[,-1]
+      # for (i in index){
+      #   if(grepl('factormar',i)==TRUE){
+      #     tm_2=eval(parse(text=i))[[2]]
+      #     xxx_21<-c(xxx_21,tm_2)
+      #   }
+      # }
+
+        xxx_2<-xxx_21
+
+      if(is.null(cov_temp)==FALSE){
+        xxx_1 <- as.matrix(cluster2[,cov_temp[1]])
+
+        if (length(cov_temp)>=2){
+          for (i in 2:length(cov_temp)){
           xxx_1<-cbind(xxx_1,cluster2[,cov_temp[i]])
         }
       }
@@ -141,8 +136,8 @@ if(penalize) {cat('Not available\n')}
       SK1<-1
       X1<-xxx
       Kn_ls<-1:Kn
-    }
-  betainit<<-matrix(rep(0,dim(xxx)[2]),ncol=1)
+
+  betainit<-matrix(rep(0,dim(xxx)[2]),ncol=1)
 
 
 
@@ -266,10 +261,10 @@ if(penalize) {cat('Not available\n')}
         tol = 1e-6, maxIter = 30, maxInner = 500,
         pphi = 1.0, rho = 0.0
       )
-      betainit <<- as.matrix(res_iter$betainit)
-      mu       <<- as.matrix(res_iter$mu)
-      rho      <<- res_iter$rho
-      pphi     <<- res_iter$pphi
+      betainit <- as.matrix(res_iter$betainit)
+      mu       <- as.matrix(res_iter$mu)
+      rho      <- res_iter$rho
+      pphi     <- res_iter$pphi
       SK1      <- res_iter$SK1
 
 
@@ -282,7 +277,7 @@ if(penalize) {cat('Not available\n')}
       else  break
     }
 
-  cat('Estimation of Beta Complete.\n')
+  cat('Estimation of Beta Has Completed.\n')
 
 
 
@@ -420,14 +415,14 @@ if(penalize) {cat('Not available\n')}
 
 
 
-  betainit <<- as.numeric(betainit)
+  betainit <- as.numeric(betainit)
   gSS      <- as.numeric(gSS)
   kk       <- as.integer(kk)
   covnum   <- as.integer(covnum)
-  K        <<- as.integer(K)
-  n       <<- as.integer(n)
-  new_uid <<- as.integer(new_uid)
-  id      <<- as.integer(id)
+  K        <- as.integer(K)
+  n       <- as.integer(n)
+  new_uid <- as.integer(new_uid)
+  id      <- as.integer(id)
   xxx <- as.matrix(xxx)
   mode(xxx) <- "numeric"
   c1     <- as.numeric(c1)
@@ -436,34 +431,34 @@ if(penalize) {cat('Not available\n')}
   gg1    <- as.numeric(gg1)
   Lambda <- as.numeric(Lambda)
 
-  sandv <<- sandwich_rcpp(rho, 1, betainit, gSS, kk, covnum, K, n, new_uid,
+  sandv <- sandwich_rcpp(rho, 1, betainit, gSS, kk, covnum, K, n, new_uid,
                              xxx, c1, t2, tt1, gg1, Lambda, id)
   z=betainit/sqrt(sandv)
   p_value = 2 * (1 - pnorm(abs(z)))
-  result<<-data.frame(
+  result<-data.frame(
     x1=c(betainit),
     x2=c(exp(betainit)),
     x3=c(sqrt(sandv)),
     x4=c(z),
     x5=c(p_value))
-  colnames(result)<<-c('coef','exp(coef)','se(coef)','z','p')
+  colnames(result)<-c('coef','exp(coef)','se(coef)','z','p')
   k=0
   if(is.null(cov_temp)==FALSE){
-    rownames(result)[1:length(cov_temp)]<<-cov_temp
+    rownames(result)[1:length(cov_temp)]<-cov_temp
     if(is.null(typelist)==FALSE){
         for (i in 1:length(typedumlist)){
-          rownames(result)[i+length(cov_temp)]<<-typedumlist[i]
+          rownames(result)[i+length(cov_temp)]<-typedumlist[i]
         }
       }
   }
   else{
     for (i in 1:length(typedumlist)){
-      rownames(result)[i]<<-typedumlist[i]
+      rownames(result)[i]<-typedumlist[i]
     }
   }
   cat('Call:\n')
   print(match.call())
   print(result)
   cat('Correlation:', rho)
-  }
+
   }
