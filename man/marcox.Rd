@@ -4,7 +4,7 @@
 \alias{marcox}
 \title{Analysis for Cox Proportional Hazards Models}
 \usage{
-marcox(formula, dat)
+marcox(formula, dat, prt = FALSE)
 }
 \arguments{
 \item{formula}{A model formula that uses the \code{Surv()} function to define the survival outcome. It should include
@@ -12,6 +12,8 @@ both continuous and categorical covariates, where categorical variables must be 
 
 \item{dat}{A list containing the dataset as prepared by the \code{init()} function. This list must include the processed data frame
 and original column names to ensure proper matching of variables.}
+
+\item{prt}{Logical. If \code{TRUE}, the result will be printed to the console.}
 }
 \value{
 A data frame (if \code{penalize=FALSE}) or a list (if \code{penalize=TRUE}) containing the following components:
@@ -46,5 +48,5 @@ shrinking insignificant coefficients toward zero.
 \examples{
   dat <- init(kidney_data, div = 2)
   formula <- Surv(time, cens) ~ sex + factormar('type', d_v=c(1,2,3))
-  result1 <- marcox(formula, dat)
+  result1 <- marcox(formula, dat, prt = TRUE)
 }

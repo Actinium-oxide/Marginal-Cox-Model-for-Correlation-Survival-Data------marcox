@@ -10,6 +10,8 @@
 #' both continuous and categorical covariates, where categorical variables must be specified using the \code{factormar()} function.
 #' @param dat A list containing the dataset as prepared by the \code{init()} function. This list must include the processed data frame
 #' and original column names to ensure proper matching of variables.
+#' @param prt Logical. If \code{TRUE}, the result will be printed to the console.
+#'
 #' @useDynLib marcox, .registration = TRUE
 #' @importFrom Rcpp evalCpp
 #' @import RcppEigen
@@ -37,13 +39,14 @@
 #' When the \code{penalize} parameter is enabled, the function applies a SCAD-type penalty to perform variable selection. A range of tuning parameters,
 #' determined by \code{pen_tp}, is evaluated via a GCV criterion to select the optimal penalty strength. This process helps in reducing model complexity by
 #' shrinking insignificant coefficients toward zero.
-#'
+#' @importFrom utils getFromNamespace
 #' @examples
 #'   dat <- init(kidney_data, div = 2)
 #'   formula <- Surv(time, cens) ~ sex + factormar('type', d_v=c(1,2,3))
-#'   result1 <- marcox(formula, dat)
+#'   result1 <- marcox(formula, dat, prt = TRUE)
 #' @export
-marcox<-function(formula,dat){
+#'
+marcox<-function(formula,dat,prt=FALSE){
   cluster2<-dat[[1]]
   col_num<-dim(cluster2)[2]
   new_id<-cluster2$id
@@ -78,6 +81,8 @@ marcox<-function(formula,dat){
       cov_temp<-c()
       xxx_1<-c()
       xxx_21=matrix(0,Kn,1)
+      pphir=1
+      rhor=0
       for (i in 1:length(index)){index[i]<-gsub(' ','',index[i])}
       for (j in index){
         if (grepl('factormar\\(',j)==FALSE){cov_temp<-c(cov_temp,j)}
@@ -94,13 +99,14 @@ marcox<-function(formula,dat){
             para=substring(para,first = 2,last = nchar(para)-2)
             factorls=list(typename=para,cluster22=cluster2)
           }
-          tm=do.call(factormar,factorls)
+          factormar_function <- getFromNamespace("factormar", "marcox")
+          tm=do.call(factormar_function,factorls)
           #tm=eval(parse(text=j))
           tm_1=tm[[1]]
           typelist<-c(typelist,tm_1[1])
           typedumlist<-c(typedumlist,tm_1[2:length(tm_1)])
 
-          tm_2 <- do.call(factormar,factorls)[[2]]
+          tm_2 <- do.call(factormar_function,factorls)[[2]]
           xxx_21<-cbind(xxx_21,tm_2)
         }}
       xxx_21=xxx_21[,-1]
@@ -254,17 +260,15 @@ marcox<-function(formula,dat){
 
 
 
-
-
       res_iter <- marcox_iterCpp(
         X1, betainit, Lambda, c1, W1, id, new_uid, n,
         tol = 1e-6, maxIter = 30, maxInner = 500,
-        pphi = 1.0, rho = 0.0
+        pphi=pphir, rho=rhor
       )
       betainit <- as.matrix(res_iter$betainit)
       mu       <- as.matrix(res_iter$mu)
-      rho      <- res_iter$rho
-      pphi     <- res_iter$pphi
+      rhor      <- res_iter$rho
+      pphir     <- res_iter$pphi
       SK1      <- res_iter$SK1
 
 
@@ -276,11 +280,6 @@ marcox<-function(formula,dat){
       }
       else  break
     }
-
-  cat('Estimation of Beta Has Completed.\n')
-
-
-
 
   # betacorr<-rho
   # betascale<-1
@@ -423,7 +422,7 @@ marcox<-function(formula,dat){
   n       <- as.integer(n)
   new_uid <- as.integer(new_uid)
   id      <- as.integer(id)
-  xxx <- as.matrix(xxx)
+  xxx <- unname(as.matrix(xxx))
   mode(xxx) <- "numeric"
   c1     <- as.numeric(c1)
   t2     <- as.numeric(t2)
@@ -431,7 +430,7 @@ marcox<-function(formula,dat){
   gg1    <- as.numeric(gg1)
   Lambda <- as.numeric(Lambda)
 
-  sandv <- sandwich_rcpp(rho, 1, betainit, gSS, kk, covnum, K, n, new_uid,
+  sandv <- sandwich_rcpp(rhor, 1, betainit, gSS, kk, covnum, K, n, new_uid,
                              xxx, c1, t2, tt1, gg1, Lambda, id)
   z=betainit/sqrt(sandv)
   p_value = 2 * (1 - pnorm(abs(z)))
@@ -456,9 +455,12 @@ marcox<-function(formula,dat){
       rownames(result)[i]<-typedumlist[i]
     }
   }
-  cat('Call:\n')
-  print(match.call())
-  print(result)
-  cat('Correlation:', rho)
+  marcox_result <- list(
+    Call = match.call(),
+    Estimation = result,
+    correlation = rhor
+  )
+if(prt){print(marcox_result)}
+  return(marcox_result)
 
   }

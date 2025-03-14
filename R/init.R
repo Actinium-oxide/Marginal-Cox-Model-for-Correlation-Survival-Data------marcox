@@ -40,7 +40,7 @@ init <- function(ad,sep='\t',div=NULL){
 
 
   if(is.null(div)==FALSE){
-  if (dim(cluster2)[1]%%div!=0){ print ('ERROR IN DIVISION')}
+  if (dim(cluster2)[1]%%div!=0){ warning ('ERROR IN DIVISION')}
 
   else{
     id<-NULL
@@ -71,12 +71,12 @@ init <- function(ad,sep='\t',div=NULL){
   }
   }
   else{
+    id<-cluster2$id
     cluster2[,'original_id'] <- id
     col_num<-dim(cluster2)[2]
     cluster2_backup<-cluster2
   }
 
   cluster2<-cluster2[order(cluster2$id),]
-
   return(list(cluster2,col_name_origin))
 }

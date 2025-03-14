@@ -104,7 +104,7 @@ List marcox_iterCpp(
         double nd = (double)n[i];
         sum_n_n1 += nd*(nd-1.0);
       }
-      double denom = sum_n_n1/2.0 - p;
+      double denom = (sum_n_n1/2.0) - p;
       rho = (1.0/pphi) * rres / denom;
 
 

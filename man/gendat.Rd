@@ -5,7 +5,7 @@
 \title{Generate Simulated Datasets for Cox Proportional Hazards Model}
 \usage{
 gendat(
-  binary = T,
+  binary = TRUE,
   dimension = 10,
   K = 30,
   n = 2,
@@ -13,7 +13,7 @@ gendat(
   b1 = log(2),
   theta = 5,
   censrate = 0.5,
-  result_data_length = NULL
+  prt = FALSE
 )
 }
 \arguments{
@@ -38,7 +38,7 @@ Higher values indicate stronger within-cluster correlation.}
 
 \item{censrate}{Numeric. The target censoring rate for the dataset.}
 
-\item{result_data_length}{Integer or \code{NULL}. If specified, truncates each dataset to the given number of rows.}
+\item{prt}{Logical. If \code{TRUE}, the result will be printed to the console.}
 }
 \value{
 A list containing:
@@ -53,10 +53,9 @@ This function generates multiple datasets for survival analysis based on a Cox p
 The baseline hazard function follows either a Weibull or an exponential distribution, depending on the values of \code{lambda}.
 The function ensures that the maximum observed time in both the control and treatment groups is checked for censoring.
 If the maximum time is not censored, it is forced to be censored to maintain the desired censoring rate.
-Users can also specify \code{result_data_length} to control the number of rows in each dataset.
 }
 \examples{
 # Generate datasets with 5 datasets, 2 clusters, and 100 samples per cluster
-gendat(binary = FALSE, dimension = 5, K = 100, n = 2, lambda = c(1, 2),
-      b1 = log(2), theta = 8, censrate = 0.3, result_data_length = 20)
+gendat(binary = FALSE, dimension = 3, K = 5, n = 5, lambda = c(1, 2),
+      b1 = log(2), theta = 8, censrate = 0.3, prt = TRUE)
 }
