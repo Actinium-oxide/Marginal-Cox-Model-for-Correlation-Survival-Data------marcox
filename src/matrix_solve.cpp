@@ -1,7 +1,16 @@
+#ifdef __GNUC__
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wignored-attributes"
+#endif
 #include <RcppEigen.h>
-#include<Rcpp.h>
 #include <Eigen/Cholesky>
 #include <Eigen/SVD>
+#ifdef __GNUC__
+#pragma GCC diagnostic pop
+#endif
+
+#include<Rcpp.h>
+
 #include <cmath>
 
 using namespace Rcpp;

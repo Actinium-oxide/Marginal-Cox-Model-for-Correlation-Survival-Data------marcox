@@ -5,25 +5,24 @@
 \title{Generate Simulated Datasets for Cox Proportional Hazards Model}
 \usage{
 gendat(
-  binary = TRUE,
+  type = "bin",
   dimension = 10,
   K = 30,
   n = 2,
   lambda = c(1, 2),
-  b1 = log(2),
-  theta = 5,
-  censrate = 0.5,
-  prt = FALSE
+  b1 = c(log(2), -0.1),
+  theta = 8,
+  censrate = 0.3
 )
 }
 \arguments{
-\item{binary}{Logical. If \code{TRUE}, the covariate is generated as a binary variable; otherwise, a continuous covariate is generated.}
+\item{type}{Character. If \code{type = 'bin'}, the covariates are generated as  binary variables; if \code{type = 'cont'}  continuous covariates are generated.}
 
 \item{dimension}{Integer. The number of datasets to be generated.}
 
-\item{K}{Integer. The number of samples within each cluster.}
+\item{K}{Integer. The number of clusters (groups) within each dataset.}
 
-\item{n}{Integer. The number of clusters (groups) within each dataset.}
+\item{n}{Integer. The number of samples within each cluster.}
 
 \item{lambda}{Numeric vector. A two-element vector specifying the parameters for the baseline distribution:
 \itemize{
@@ -31,14 +30,12 @@ gendat(
 \item If \code{lambda = c(1, b)}, the baseline follows an exponential distribution.
 }}
 
-\item{b1}{Numeric. The regression coefficient for the covariate, affecting the hazard function.}
+\item{b1}{Vector. The regression coefficient for the covariates, affecting the hazard function. We suggest that the maximum of \code{b1} should be lower than 2.}
 
 \item{theta}{Numeric. A parameter controlling the dependency structure between survival times within clusters.
 Higher values indicate stronger within-cluster correlation.}
 
 \item{censrate}{Numeric. The target censoring rate for the dataset.}
-
-\item{prt}{Logical. If \code{TRUE}, the result will be printed to the console.}
 }
 \value{
 A list containing:
@@ -55,7 +52,7 @@ The function ensures that the maximum observed time in both the control and trea
 If the maximum time is not censored, it is forced to be censored to maintain the desired censoring rate.
 }
 \examples{
-# Generate datasets with 5 datasets, 2 clusters, and 100 samples per cluster
-gendat(binary = FALSE, dimension = 3, K = 5, n = 5, lambda = c(1, 2),
-      b1 = log(2), theta = 8, censrate = 0.3, prt = TRUE)
+# Generate binary covariate datasets with 1 datasets, 10 clusters, and 6 samples per cluster
+print(gendat(type = 'bin', dimension = 1, K = 6, n = 10, lambda = c(1, 2),
+      b1 = c(log(2),-log(2)), theta = 8, censrate = 0.5))
 }

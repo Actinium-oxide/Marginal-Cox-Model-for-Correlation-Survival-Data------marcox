@@ -4,7 +4,7 @@
 \alias{marcox}
 \title{Analysis for Cox Proportional Hazards Models}
 \usage{
-marcox(formula, dat, prt = FALSE)
+marcox(formula, dat, method = "exc")
 }
 \arguments{
 \item{formula}{A model formula that uses the \code{Surv()} function to define the survival outcome. It should include
@@ -13,40 +13,42 @@ both continuous and categorical covariates, where categorical variables must be 
 \item{dat}{A list containing the dataset as prepared by the \code{init()} function. This list must include the processed data frame
 and original column names to ensure proper matching of variables.}
 
-\item{prt}{Logical. If \code{TRUE}, the result will be printed to the console.}
+\item{method}{The method employed to solve the correlation coefficient:
+\itemize{
+\item Exchangeable correlation structure: \code{method = 'exc'}
+\item Autoregressive(AR-1): \code{method = 'ar1'}
+\item k-dependent: \code{method = 'kd'}
+\item Toeplitz: \code{method = 'toep'}
+\item Independent: \code{method = 'indp'}
+\item Unstructured: \code{method = 'uns'}
+}}
 }
 \value{
-A data frame (if \code{penalize=FALSE}) or a list (if \code{penalize=TRUE}) containing the following components:
+A data frame containing the following components:
 \itemize{
-\item \strong{For the standard marcox analysis}:
-\itemize{
-\item \code{coef} - The estimated regression coefficients.
-\item \code{exp(coef)} - The exponentiated coefficients (hazard ratios).
-\item \code{se(coef)} - The standard errors of the estimated coefficients.
-\item \code{z} - The z-statistics for testing the significance of the coefficients.
-\item \code{p} - The p-values associated with the coefficients.
-\item \code{Correlation]} - The correlation coefficient of the data.
-}
+
+\if{html}{\out{<div class="sourceCode">}}\preformatted{  \\item \code{coef} - The estimated regression coefficients.
+  \\item \code{exp(coef)} - The exponentiated coefficients (hazard ratios).
+  \\item \code{se(coef)} - The standard errors of the estimated coefficients.
+  \\item \code{z} - The z-statistics for testing the significance of the coefficients.
+  \\item \code{p} - The p-values associated with the coefficients.
+  \\item \code{Correlation]} - The correlation coefficient of the data.
+}\if{html}{\out{</div>}}
 
 }
 }
 \description{
 This function performs marcox analysis for Cox proportional hazards models, incorporating clustered data
 and handling time-dependent covariates. It estimates coefficients, standard errors, and p-values based on
-the specified formula and dataset. In addition, an optional penalization functionality is provided via the
-\code{penalize} parameter. When \code{penalize} is set to TRUE, the function applies a SCAD-type penalty with
-tuning parameter selection via a GCV criterion to perform variable selection.
+the specified formula and dataset.
 }
 \details{
 The \code{marcox()} function is specifically designed for survival data analysis using Cox proportional hazards models. It handles both clustered and time-dependent covariates effectively.
 The survival outcome must be defined using the \code{Surv()} function in the model formula, and covariates can be included directly or by converting categorical variables with the \code{factormar()} function.
-
-When the \code{penalize} parameter is enabled, the function applies a SCAD-type penalty to perform variable selection. A range of tuning parameters,
-determined by \code{pen_tp}, is evaluated via a GCV criterion to select the optimal penalty strength. This process helps in reducing model complexity by
-shrinking insignificant coefficients toward zero.
 }
 \examples{
   dat <- init(kidney_data, div = 2)
   formula <- Surv(time, cens) ~ sex + factormar('type', d_v=c(1,2,3))
-  result1 <- marcox(formula, dat, prt = TRUE)
+  result1 <- marcox(formula, dat, method = 'exc')
+  print(result1)
 }

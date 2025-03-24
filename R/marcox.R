@@ -2,51 +2,50 @@
 #' @description
 #' This function performs marcox analysis for Cox proportional hazards models, incorporating clustered data
 #' and handling time-dependent covariates. It estimates coefficients, standard errors, and p-values based on
-#' the specified formula and dataset. In addition, an optional penalization functionality is provided via the
-#' \code{penalize} parameter. When \code{penalize} is set to TRUE, the function applies a SCAD-type penalty with
-#' tuning parameter selection via a GCV criterion to perform variable selection.
+#' the specified formula and dataset.
 #'
 #' @param formula A model formula that uses the \code{Surv()} function to define the survival outcome. It should include
 #' both continuous and categorical covariates, where categorical variables must be specified using the \code{factormar()} function.
 #' @param dat A list containing the dataset as prepared by the \code{init()} function. This list must include the processed data frame
 #' and original column names to ensure proper matching of variables.
-#' @param prt Logical. If \code{TRUE}, the result will be printed to the console.
-#'
+#' @param method The method employed to solve the correlation coefficient:
+#' \itemize{
+#'     \item Exchangeable correlation structure: \code{method = 'exc'}<<Default>>
+#'     \item Autoregressive(AR-1): \code{method = 'ar1'}
+#'     \item k-dependent: \code{method = 'kd'}
+#'     \item Toeplitz: \code{method = 'toep'}
+#'     \item Independent: \code{method = 'indp'}
+#'     \item Unstructured: \code{method = 'uns'}
+#' @param k_value The k value only for k-dependent structure. The default value is 1.
+#' }
 #' @useDynLib marcox, .registration = TRUE
 #' @importFrom Rcpp evalCpp
 #' @import RcppEigen
 #' @import Matrix
 #' @import survival
-#' @return A data frame (if \code{penalize=FALSE}) or a list (if \code{penalize=TRUE}) containing the following components:
+#' @return A data frame containing the following components:
 #' \itemize{
-#'   \item \strong{For the standard marcox analysis}:
-#'     \itemize{
+#'
 #'       \item \code{coef} - The estimated regression coefficients.
 #'       \item \code{exp(coef)} - The exponentiated coefficients (hazard ratios).
 #'       \item \code{se(coef)} - The standard errors of the estimated coefficients.
 #'       \item \code{z} - The z-statistics for testing the significance of the coefficients.
 #'       \item \code{p} - The p-values associated with the coefficients.
-#'       \item \code{Correlation]} - The correlation coefficient of the data.
-#'     }
-#'
+#'       \item \code{correlation]} - correlation coefficients of the data.
 #'
 #' }
-#'
 #' @details
 #' The \code{marcox()} function is specifically designed for survival data analysis using Cox proportional hazards models. It handles both clustered and time-dependent covariates effectively.
 #' The survival outcome must be defined using the \code{Surv()} function in the model formula, and covariates can be included directly or by converting categorical variables with the \code{factormar()} function.
-#'
-#' When the \code{penalize} parameter is enabled, the function applies a SCAD-type penalty to perform variable selection. A range of tuning parameters,
-#' determined by \code{pen_tp}, is evaluated via a GCV criterion to select the optimal penalty strength. This process helps in reducing model complexity by
-#' shrinking insignificant coefficients toward zero.
 #' @importFrom utils getFromNamespace
 #' @examples
 #'   dat <- init(kidney_data, div = 2)
 #'   formula <- Surv(time, cens) ~ sex + factormar('type', d_v=c(1,2,3))
-#'   result1 <- marcox(formula, dat, prt = TRUE)
+#'   result1 <- marcox(formula, dat, method = 'exc')
+#'   print(result1)
 #' @export
 #'
-marcox<-function(formula,dat,prt=FALSE){
+marcox<-function(formula,dat,method='exc',k_value=1){
   cluster2<-dat[[1]]
   col_num<-dim(cluster2)[2]
   new_id<-cluster2$id
@@ -82,7 +81,12 @@ marcox<-function(formula,dat,prt=FALSE){
       xxx_1<-c()
       xxx_21=matrix(0,Kn,1)
       pphir=1
-      rhor=0
+
+      if(method %in% c('exc','ar1','indp')){rhor=0}
+      else if(method=='kd'){rhor=rep(0,k_value)}
+      else if(method=='toep'){rhor=rep(0,(max(n)-1))}
+      else {rhor=matrix(0,max(n),max(n))}
+
       for (i in 1:length(index)){index[i]<-gsub(' ','',index[i])}
       for (j in index){
         if (grepl('factormar\\(',j)==FALSE){cov_temp<-c(cov_temp,j)}
@@ -91,11 +95,15 @@ marcox<-function(formula,dat,prt=FALSE){
           para=gsub('factormar\\(','',para)
           para=gsub('typename=','',para)
           para=gsub('d_v=','',para)
+          para=gsub('typename<-','',para)
+          para=gsub('d_v<-','',para)
           if(grepl('c\\(',para)){
             d_vec <- substring(para,first = regexpr('c\\(',para)[[1]],last = nchar(para)-1)
             typenm <- substring(para,first=2,last =  regexpr('c\\(',para)[[1]]-3)
             factorls <- list(typename=typenm,d_v=d_vec,cluster22=cluster2)
           }else{
+            para=gsub('NULL','',para)
+            para=gsub(',','',para)
             para=substring(para,first = 2,last = nchar(para)-2)
             factorls=list(typename=para,cluster22=cluster2)
           }
@@ -128,8 +136,8 @@ marcox<-function(formula,dat,prt=FALSE){
         }
       }
       }
+      if(is.null(xxx_1)){xxx<-xxx_2}else{
       if (is.null(typelist)==FALSE){xxx<-cbind(xxx_1,xxx_2)}
-      else {if(is.null(xxx_1)){xxx<-xxx_2}
         else{xxx<-xxx_1}}
       xxx<-as.matrix(xxx)
       covnum<-dim(xxx)[2]
@@ -149,12 +157,14 @@ marcox<-function(formula,dat,prt=FALSE){
 
     repeat{
       gSS1 <- rep(1,kk)
-      temp1<-sum(g11[min((1:(Kn))[t11==tt1[1]]):(Kn)]*exp(x111[(min((1:(Kn))[t11==tt1[1]]):(Kn)),]%*%betainit))
+      temp1<-sum(g11[min((1:(Kn))[t11==tt1[1]]):(Kn)]*
+                   exp(x111[(min((1:(Kn))[t11==tt1[1]]):(Kn)),]%*%betainit))
       gSS <- rep(1,kk)
       gSS[1]<-dd[1]/temp1
       for (i in 1:(kk-1))
       {
-        gSS[i+1]<-gSS[i]+dd[i+1]/(sum(g11[min((1:(Kn))[t11==tt1[i+1]]):(Kn)]*exp(x111[min((1:(Kn))[t11==tt1[i+1]]):(Kn),]%*%betainit)))
+        gSS[i+1]<-gSS[i]+dd[i+1]/(sum(g11[min((1:(Kn))[t11==tt1[i+1]]):(Kn)]*
+                                exp(x111[min((1:(Kn))[t11==tt1[i+1]]):(Kn),]%*%betainit)))
       }
 
       gSS1<-exp(-gSS)
@@ -259,12 +269,40 @@ marcox<-function(formula,dat,prt=FALSE){
       #######################
 
 
-
-      res_iter <- marcox_iterCpp(
-        X1, betainit, Lambda, c1, W1, id, new_uid, n,
-        tol = 1e-6, maxIter = 30, maxInner = 500,
-        pphi=pphir, rho=rhor
+      res_iter <- switch (method,
+        'exc' = marcox_iter_excCpp(
+          X1, betainit, Lambda, c1, W1, id, new_uid, n,
+          tol = 1e-6, maxIter = 30, maxInner = 500,
+          pphi=pphir, rho=rhor
+        ),
+        'ar1'=marcox_iter_ar1Cpp(
+          X1, betainit, Lambda, c1, W1, id, new_uid, n,
+          tol = 1e-6, maxIter = 30, maxInner = 500,
+          pphi=pphir, rho=rhor
+        ),
+        'toep'=marcox_iter_toepCpp(
+          X1, betainit, Lambda, c1, W1, id, new_uid, n,
+          tol = 1e-6, maxIter = 30, maxInner = 500,
+          pphi=pphir, rho=rhor
+        ),
+        'kd'=marcox_iter_kdCpp(
+          X1, betainit, Lambda, c1, W1, id, new_uid, n,
+          tol = 1e-6, maxIter = 30, maxInner = 500,
+          pphi=pphir, rho=rhor, kv=k_value
+        ),
+        'uns'=marcox_iter_unsCpp(
+          X1, betainit, Lambda, c1, W1, id, new_uid, n,
+          tol = 1e-6, maxIter = 30, maxInner = 500,
+          pphi=pphir, rho=rhor
+        ),
+        'indp'=marcox_iter_indpCpp(
+          X1, betainit, Lambda, c1, W1, id, new_uid, n,
+          tol = 1e-6, maxIter = 30, maxInner = 500,
+          pphi=pphir, rho=rhor
+        ),
+        stop('Invalid method for correlation structure')
       )
+
       betainit <- as.matrix(res_iter$betainit)
       mu       <- as.matrix(res_iter$mu)
       rhor      <- res_iter$rho
@@ -280,6 +318,13 @@ marcox<-function(formula,dat,prt=FALSE){
       }
       else  break
     }
+
+
+
+
+
+
+
 
   # betacorr<-rho
   # betascale<-1
@@ -430,8 +475,22 @@ marcox<-function(formula,dat,prt=FALSE){
   gg1    <- as.numeric(gg1)
   Lambda <- as.numeric(Lambda)
 
-  sandv <- sandwich_rcpp(rhor, 1, betainit, gSS, kk, covnum, K, n, new_uid,
-                             xxx, c1, t2, tt1, gg1, Lambda, id)
+
+  sandv <- switch (method,
+                      'exc' = sandwich_exc_rcpp(rhor, 1, betainit, gSS, kk, covnum, K, n, new_uid,
+                                                xxx, c1, t2, tt1, gg1, Lambda, id),
+                      'ar1'= sandwich_ar1_rcpp(rhor, 1, betainit, gSS, kk, covnum, K, n, new_uid,
+                                               xxx, c1, t2, tt1, gg1, Lambda, id),
+                      'toep'=sandwich_toep_rcpp(rhor, 1, betainit, gSS, kk, covnum, K, n, new_uid,
+                                               xxx, c1, t2, tt1, gg1, Lambda, id),
+                      'kd'=sandwich_kd_rcpp(rhor, 1, betainit, gSS, kk, covnum, K, n, new_uid,
+                                             xxx, c1, t2, tt1, gg1, Lambda, id, k_value),
+                      'uns'=sandwich_uns_rcpp(rhor, 1, betainit, gSS, kk, covnum, K, n, new_uid,
+                                              xxx, c1, t2, tt1, gg1, Lambda, id),
+                      'indp'=sandwich_indp_rcpp(rhor, 1, betainit, gSS, kk, covnum, K, n, new_uid,
+                                               xxx, c1, t2, tt1, gg1, Lambda, id),
+                      stop('Invalid method for correlation structure'))
+
   z=betainit/sqrt(sandv)
   p_value = 2 * (1 - pnorm(abs(z)))
   result<-data.frame(
@@ -460,7 +519,6 @@ marcox<-function(formula,dat,prt=FALSE){
     Estimation = result,
     correlation = rhor
   )
-if(prt){print(marcox_result)}
   return(marcox_result)
 
   }

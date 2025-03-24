@@ -32,14 +32,16 @@ factormar <- function(typename, d_v = NULL,cluster22) {
   lp_or <- lp
   if (is.null(d_v)) {
     dv_0 <- as.numeric(names(table(cluster22[, typename])))
-    dv_1 <- dv_0[1]
-    if (length(dv_0) > 2) {
-      for (j in 2:(length(dv_0) - 1)) {
-        dv_1 <- c(dv_1, dv_0[j])
-      }
-    }
-    dv=dv_1
-  } else {
+    dv_1 <- dv_0[order(dv_0)]
+    dv_1 <- dv_0[2:length(dv_0)]
+    # if (length(dv_0) > 2) {
+    #   for (j in 2:(length(dv_0) - 1)) {
+    #     dv_1 <- c(dv_1, dv_0[j])
+    #   }
+    # }
+    dv <- dv_1
+  }
+  else {
     dv<-eval(str2lang(d_v))}
 
   typels=rep(0,length(dv))

@@ -7,19 +7,18 @@
 #' If the maximum time is not censored, it is forced to be censored to maintain the desired censoring rate.
 #'
 #' @param dimension Integer. The number of datasets to be generated.
-#' @param K Integer. The number of samples within each cluster.
-#' @param n Integer. The number of clusters (groups) within each dataset.
+#' @param n Integer. The number of samples within each cluster.
+#' @param K Integer. The number of clusters (groups) within each dataset.
 #' @param lambda Numeric vector. A two-element vector specifying the parameters for the baseline distribution:
 #' \itemize{
 #'   \item If \code{lambda = c(a, b)}, where \code{a > 1}, the baseline follows a Weibull distribution.
 #'   \item If \code{lambda = c(1, b)}, the baseline follows an exponential distribution.
 #' }
-#' @param b1 Numeric. The regression coefficient for the covariate, affecting the hazard function.
+#' @param b1 Vector. The regression coefficient for the covariates, affecting the hazard function. We suggest that the maximum of \code{b1} should be lower than 2.
 #' @param theta Numeric. A parameter controlling the dependency structure between survival times within clusters.
 #' Higher values indicate stronger within-cluster correlation.
 #' @param censrate Numeric. The target censoring rate for the dataset.
-#' @param prt Logical. If \code{TRUE}, the result will be printed to the console.
-#' @param binary Logical. If \code{TRUE}, the covariate is generated as a binary variable; otherwise, a continuous covariate is generated.
+#' @param type Character. If \code{type = 'bin'}, the covariates are generated as  binary variables; if \code{type = 'cont'}  continuous covariates are generated.
 #'
 #' @importFrom stats pnorm rbinom rnorm runif uniroot
 #' @return A list containing:
@@ -31,34 +30,58 @@
 #'
 #' @export
 #' @examples
-#' # Generate datasets with 5 datasets, 2 clusters, and 100 samples per cluster
-#' gendat(binary = FALSE, dimension = 3, K = 5, n = 5, lambda = c(1, 2),
-#'       b1 = log(2), theta = 8, censrate = 0.3, prt = TRUE)
+#' # Generate binary covariate datasets with 1 datasets, 10 clusters, and 6 samples per cluster
+#' print(gendat(type = 'bin', dimension = 1, K = 6, n = 10, lambda = c(1, 2),
+#'       b1 = c(log(2),-log(2)), theta = 8, censrate = 0.5))
 
 
-gendat<-function(binary=TRUE,dimension=10,K=30,n=2,lambda=c(1,2),b1=log(2),theta=5,censrate=0.5,prt=FALSE){
+gendat<-function(type='bin',dimension=10,K=30,n=2,lambda=c(1,2),b1=c(log(2),-0.1),theta=8,censrate=0.3){
 datasets<-list()
 censoringrates=rep(0,dimension)
 for(lll in 1:dimension){
+  dim=length(b1)
   tt=matrix(0,K,n)
-  x2=matrix(0,K,n)
+  xxx=matrix(0,n*K,dim)
   for(i in 1:K){
     u=runif(n)
-    if(binary){x=rbinom(n,1,0.5)}else{x=rnorm(n)}
-    x2[i,]=x
+    xmat=matrix(0,dim,n)
+    if(type=='bin'){
+      for(j in 1:dim){
+        xtemp=rbinom(n,1,0.5)
+        xmat[j,]=xtemp
+      }
+    }
+    else if(type=='cont'){
+      for(j in 1:dim){
+        xtemp=rnorm(n)
+        xmat[j,]=xtemp
+      }
+    }
+    else{stop('Invalid type of covariates')}
+
+    #x2[i,]=x
+    #x2[(1+(i-1)*dim):i*dim,]=xmat
+
+    xxx[(1+(i-1)*n):(i*n),]=t(xmat)
     a=rep(0,n-1)
-    tt[i,1]=(1/lambda[2])*(-exp(-b1*x[1])*log(1-u[1]))^(1/lambda[1])
+    tt[i,1]=(1/lambda[2])*(-exp(-b1%*%xmat[,1])*log(1-u[1]))^(1/lambda[1])
     for(m in 2:n)
     {
-      a[m-1]=exp(theta*(lambda[2]*tt[i,m-1])^(lambda[1])*exp(b1*x[m-1]))
+      a[m-1]=exp(theta*(lambda[2]*tt[i,m-1])^(lambda[1])*exp(b1%*%xmat[,m-1]))
       tt[i,m]=(1/lambda[2])*((theta^(-1))*log((m-1)-sum(a)+(sum(a)-(m-2))*
-        (1-u[m])^(-(theta^(-1)+m-1)^(-1)))*exp(-b1*x[m]))^((lambda[1])^(-1))
+        (1-u[m])^(-(theta^(-1)+m-1)^(-1)))*exp(-b1%*%xmat[,m]))^((lambda[1])^(-1))
     }
   }
-  xxx=as.vector(t(x2))
+
+  for(i in 1:K){
+    for(j in 1:dim){
+
+    }
+  }
+  b1xxx=xxx %*% b1
   f2<-function(x1,y1)
   {
-    sum((x1*lambda[2]*exp(b1*xxx))^(-1)*(1-exp(-lambda[2]*exp(b1*xxx)*x1)))-y1*K*n
+    sum((x1*lambda[2]*exp(b1xxx))^(-1)*(1-exp(-lambda[2]*exp(b1xxx)*x1)))-y1*K*n
   }
   cr<-uniroot(f2, c(0.01,10),y1=censrate)$root
   censor=runif(K*n,0,cr)
@@ -92,6 +115,5 @@ ret=match.call()
 gendat_result <- list(Call=ret,
   datasets = result_dde
 )
-if(prt){print(gendat_result)}
 return (gendat_result)
 }
