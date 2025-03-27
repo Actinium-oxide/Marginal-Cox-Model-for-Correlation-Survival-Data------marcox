@@ -1,5 +1,6 @@
 #ifdef __GNUC__
 #pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wattributes"
 #pragma GCC diagnostic ignored "-Wignored-attributes"
 #endif
 #include <RcppEigen.h>
@@ -17,7 +18,8 @@ SEXP matSolCpp(const Eigen::Map<Eigen::MatrixXd> & mat,
                const double tol_cond);
 
 // [[Rcpp::export]]
-List marcox_iter_excCpp(
+List marcox_iter_Cpp(
+    Eigen::Map<Eigen::VectorXd>       &betainit_origin,
     const Eigen::Map<Eigen::MatrixXd> &X1,
     Eigen::Map<Eigen::VectorXd>       betainit,
     Eigen::Map<Eigen::VectorXd>       Lambda,
@@ -26,18 +28,26 @@ List marcox_iter_excCpp(
     const NumericVector               &id,
     const IntegerVector               &new_uid,
     const IntegerVector               &n,
-    const double tol ,
-    const int maxIter ,
-    const int maxInner,
+    const float &tol ,
+    const short &maxIter ,
+    const short &maxInner,
     double pphi,
-    double rho
+    double rho,
+    Eigen::Map<Eigen::VectorXd> rho_vec_k,
+    const int &kv,
+    Eigen::Map<Eigen::MatrixXd> rhomat,
+    const short &method
+
 ){
 
   const int Kn = X1.rows();
   const int p  = X1.cols();
   const int K  = new_uid.size();
-
-
+  Eigen::VectorXi clusteridx(K);
+  clusteridx[0]=0;
+  for(int i=1;i<K;i++){
+    clusteridx[i]=clusteridx[i-1]+n[i-1];
+  }
 
   Map<const MatrixXd> W1_eig(REAL(W1), W1.nrow(), W1.ncol());
 
@@ -54,13 +64,12 @@ List marcox_iter_excCpp(
 
 
   int SK1 = 1;
-  VectorXd beta1 = betainit;
+  VectorXd beta1_local = VectorXd::Zero(X1.cols());
 
 
   for(; SK1 <= maxIter; SK1++){
 
     bool outerBreak = false;
-    VectorXd beta1_local = betainit;
     while(true){
       VectorXd newY1(Kn);
       for(int i=0; i<Kn; i++){
@@ -81,8 +90,18 @@ List marcox_iter_excCpp(
 
       double rres = 0.0;
 
-      for(int i=0; i<K; i++){
+      //indp rho iter
+      if(method==5){
+        rho=0;
+        rhomat.diagonal().setOnes();
+      }
 
+
+
+      // exchangeable & ar1 rho iter
+      else if (method==0 || method==1 ){
+        for(int i=0; i<K; i++){
+        int idx=clusteridx[i];
         std::vector<double> groupRes;
 
         int cluster_id = new_uid[i];
@@ -104,19 +123,145 @@ List marcox_iter_excCpp(
             rres += groupRes[j]* ((tmp - groupRes[j]) );
           }
         }
+        double sum_n_n1 = 0.0;
+        for(int i=0; i<K; i++){
+          double nd = (double)n[i];
+          sum_n_n1 += nd*(nd-1.0);
+        }
+        double denom = (sum_n_n1/2.0) - p;
+        rho = (1.0/pphi) * rres / denom;
+
+        rhomat.setConstant(rho);
+        rhomat.diagonal().setOnes();
+
+        //ar1 rho iter
+        if(method==1){
+          int sum_n_n1 = 0.0;
+          for (int i = 0; i < K; i++) {
+            sum_n_n1 += n[i] - 1.0;
+          }
+          int denom = sum_n_n1 - p;
+          rho = (1.0 / pphi) * (rres / denom);
+
+          VectorXd indices = VectorXd::LinSpaced(ni, 0, ni - 1);
+          MatrixXd absDiff = (indices.replicate(1, (int)max(n)) - indices.transpose().replicate((int)max(n), 1)).cwiseAbs();
+          MatrixXd rhomattp = absDiff.unaryExpr([rho](double d) { return std::pow(rho, d); });
+          rhomattp.diagonal().setOnes();
+          rhomat.block(idx,idx,ni,ni) = rhomattp;
+          rhomattp.resize(0,0);
+      }
+      }
+      }
+
+      //toep & kd rho iter
+      else if(method==3||method==2){
+
+        for (int m = 1; m <= kv; m++) {
+          double rres = 0.0;
+          double sum_n_n1 = 0.0;
+          for (int i = 0; i < K; i++) {
+            int cluster_id = new_uid[i];
+            std::vector<double> groupRes;
+            groupRes.reserve(n[i]);
+            for (int row = 0; row < Kn; row++) {
+              if ((int)id[row] == cluster_id) {
+                groupRes.push_back(res[row]);
+              }
+            }
+            int ni = groupRes.size();
+            if (ni > m) {
+              for (int j = 0; j < ni - m; j++) {
+                rres += groupRes[j] * groupRes[j + m];
+              }
+            }
+          }
+          for (int i = 0; i < K; i++) {
+            sum_n_n1 += n[i] - m;
+          }
+          double denom = sum_n_n1 - p;
+          double rho_est;
+          if (denom > 0)
+            rho_est = (1.0 / pphi) * (rres / denom);
+          else
+            rho_est = 0.0;
+
+          if (rho_est < 0.0) {
+            rho_vec_k[m - 1] = 0.0;
+          } else if (rho_est > 1.0) {
+            rho_vec_k[m - 1] = 1.0;
+          } else {
+            double alpha_damp = 1.0;
+            rho_vec_k[m - 1] = alpha_damp * rho_est + (1.0 - alpha_damp) * rho_vec_k[m - 1];
+          }
+        }
+
+        for(int i=0;i<K;i++){
+          int ni = n[i];
+          int idx=clusteridx[i];
+          VectorXd indices = VectorXd::LinSpaced(ni, 0, ni - 1);
+          MatrixXd Diff = indices.replicate(1, ni) - indices.transpose().replicate(ni, 1);
+          MatrixXd absDiff = Diff.cwiseAbs();
+          MatrixXd rhomattp = absDiff.unaryExpr([&rho_vec_k, kv](double d) -> double {
+            int lag = static_cast<int>(d + 0.5);
+            return (lag == 0) ? 1.0 : ((lag > kv) ? 0.0 : rho_vec_k(lag - 1));
+          });
+          rhomattp.diagonal().setOnes();
+          rhomat.block(idx,idx,ni,ni)=rhomattp;
+          rhomattp.resize(0,0);
+      }
       }
 
 
-      double sum_n_n1 = 0.0;
-      for(int i=0; i<K; i++){
-        double nd = (double)n[i];
-        sum_n_n1 += nd*(nd-1.0);
-      }
-      double denom = (sum_n_n1/2.0) - p;
-      rho = (1.0/pphi) * rres / denom;
+      //uns rho iter
 
+      else if(method==4){
+
+        for(int ii=0;ii<K;ii++){
+          int ni=n[ii];
+          int idx=clusteridx[ii];
+        for (int p = idx; p < ni; ++p) {
+          for (int q = p+1; q < ni; ++q) {
+            double rres = 0.0;
+            for (int i = 0; i < K; ++i) {
+              int cluster_id = new_uid[i];
+              std::vector<double> groupRes;
+              groupRes.reserve(ni);
+              for (int row = 0; row < Kn; ++row) {
+                if ((int)id[row] == cluster_id) {
+                  groupRes.push_back(res[row]);
+                }
+              }
+                rres += groupRes[p] * groupRes[q];
+              }
+
+
+
+            double denom = K - p;
+            if(denom <= 0) {
+              rhomat(p, q) = 0.0;
+              rhomat(q, p) = 0.0;
+            } else {
+              double rho_est = (1.0 / pphi) * (rres / denom);
+
+              if(rho_est < 0.0) {
+                rhomat(p, q) = 0.0;
+                rhomat(q, p) = 0.0;
+              } else if(rho_est > 1.0) {
+                rhomat(p, q) = 1.0;
+                rhomat(q, p) = 1.0;
+              } else {
+                rhomat(p, q) = rho_est;
+                rhomat(q, p) = rho_est;
+              }
+            }
+          }
+        }
+        }
+        rhomat.diagonal().setOnes();
+      }
 
       int SK=1;
+      MatrixXd R1(0,0);
       while(true){
 
         MatrixXd D1 = MatrixXd::Zero(Kn, p);
@@ -176,10 +321,14 @@ List marcox_iter_excCpp(
               }
             }
 
-            MatrixXd R1 = MatrixXd::Constant(ni, ni, rho);
-            for(int d=0; d<ni; d++){
-              R1(d,d) = 1.0;
-            }
+            // MatrixXd R1 = MatrixXd::Constant(ni, ni, rho);
+            // for(int d=0; d<ni; d++){
+            //   R1(d,d) = 1.0;
+            // }
+
+            R1.resize(ni,ni);
+            int idx=clusteridx[i];
+            R1=rhomat.block(idx,idx,ni,ni);
 
             MatrixXd sqrtDiag = MatrixXd::Zero(ni, ni);
             for(int r=0; r<ni; r++){
@@ -220,9 +369,10 @@ List marcox_iter_excCpp(
 
         VectorXd diff = geebeta - betainit;
         double maxDiff = diff.cwiseAbs().maxCoeff();
-        if(maxDiff > 1e-6 && SK <= maxInner) {
+        if(maxDiff > tol && SK <= maxInner) {
 
           betainit = geebeta;
+          //std::cout <<  betainit.transpose() << std::endl;
 
           for(int i=0; i<Kn; i++){
             double val=0.0;
@@ -240,7 +390,7 @@ List marcox_iter_excCpp(
 
       VectorXd diff2 = betainit - beta1_local;
       double md2 = diff2.cwiseAbs().maxCoeff();
-      if(md2>1e-6 && SK1 < maxIter){
+      if(md2>tol && SK1 < maxIter){
         beta1_local = betainit;
       } else {
 
@@ -259,6 +409,8 @@ List marcox_iter_excCpp(
     _["mu"]       = mu,
     _["pphi"]     = pphi,
     _["rho"]      = rho,
-    _["SK1"]      = SK1
+    _["SK1"]      = SK1,
+    _["rhomat"]   = rhomat,
+    _["clusteridx"]= clusteridx
   );
 }

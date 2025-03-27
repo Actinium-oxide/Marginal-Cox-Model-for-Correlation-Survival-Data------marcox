@@ -57,10 +57,14 @@ marcox<-function(formula,dat,method='exc',k_value=1){
       for(i in 1:K){
         n[i]<- sum(id==new_uid[i])
       }
+      if(k_value>=max(n)){
+        warning('Invalid k-value for method "kd". Do you mean "method = toep"? ')
+      }
       t2<-cluster2[,as.character(formula[[2]][[2]])]
       c1<-cluster2[,as.character(formula[[2]][[3]])]
       Y1<-matrix(cluster2[,as.character(formula[[2]][[3]])],ncol=1)
       cens<-c1
+      tm=NULL
       t11<-sort(t2)
       c11<-c1[order(t2)]
       tt1<-unique(t11[c11==1])
@@ -81,12 +85,7 @@ marcox<-function(formula,dat,method='exc',k_value=1){
       xxx_1<-c()
       xxx_21=matrix(0,Kn,1)
       pphir=1
-
-      if(method %in% c('exc','ar1','indp')){rhor=0}
-      else if(method=='kd'){rhor=rep(0,k_value)}
-      else if(method=='toep'){rhor=rep(0,(max(n)-1))}
-      else {rhor=matrix(0,max(n),max(n))}
-
+      rhor=0
       for (i in 1:length(index)){index[i]<-gsub(' ','',index[i])}
       for (j in index){
         if (grepl('factormar\\(',j)==FALSE){cov_temp<-c(cov_temp,j)}
@@ -150,10 +149,25 @@ marcox<-function(formula,dat,method='exc',k_value=1){
       SK1<-1
       X1<-xxx
       Kn_ls<-1:Kn
+      rhomat <- diag(1,Kn);
+      if(is.null(typelist)){
+      betainit_origin <- as.matrix(survival::coxph(update(formula,.~.+cluster(id)),dat[[1]])$coef)
+      }
+      else{betainit_origin <- rep(0,dim(xxx)[2])}
+      betainit <- betainit_origin
+      # betainit<-matrix(rep(0,dim(xxx)[2]),ncol=1)
 
-  betainit<-matrix(rep(0,dim(xxx)[2]),ncol=1)
-
-
+      methodd <- switch (method,
+                         'exc' = 0,
+                         'ar1'=1,
+                         'toep'=2,
+                         'kd'=3,
+                         'uns'=4,
+                         'indp'=5,
+                         stop('Invalid method for correlation structure')
+      )
+      if(method==2){k_value=max(n)-1}
+      rho_vec_k=rep(0,k_value)
 
     repeat{
       gSS1 <- rep(1,kk)
@@ -269,48 +283,59 @@ marcox<-function(formula,dat,method='exc',k_value=1){
       #######################
 
 
-      res_iter <- switch (method,
-        'exc' = marcox_iter_excCpp(
-          X1, betainit, Lambda, c1, W1, id, new_uid, n,
-          tol = 1e-6, maxIter = 30, maxInner = 500,
-          pphi=pphir, rho=rhor
-        ),
-        'ar1'=marcox_iter_ar1Cpp(
-          X1, betainit, Lambda, c1, W1, id, new_uid, n,
-          tol = 1e-6, maxIter = 30, maxInner = 500,
-          pphi=pphir, rho=rhor
-        ),
-        'toep'=marcox_iter_toepCpp(
-          X1, betainit, Lambda, c1, W1, id, new_uid, n,
-          tol = 1e-6, maxIter = 30, maxInner = 500,
-          pphi=pphir, rho=rhor
-        ),
-        'kd'=marcox_iter_kdCpp(
-          X1, betainit, Lambda, c1, W1, id, new_uid, n,
-          tol = 1e-6, maxIter = 30, maxInner = 500,
-          pphi=pphir, rho=rhor, kv=k_value
-        ),
-        'uns'=marcox_iter_unsCpp(
-          X1, betainit, Lambda, c1, W1, id, new_uid, n,
-          tol = 1e-6, maxIter = 30, maxInner = 500,
-          pphi=pphir, rho=rhor
-        ),
-        'indp'=marcox_iter_indpCpp(
-          X1, betainit, Lambda, c1, W1, id, new_uid, n,
-          tol = 1e-6, maxIter = 30, maxInner = 500,
-          pphi=pphir, rho=rhor
-        ),
-        stop('Invalid method for correlation structure')
-      )
+
+
+      res_iter <- marcox_iter_Cpp(
+            betainit_origin,X1, betainit, Lambda, c1, W1, id, new_uid, n,
+            tol = 1e-6, maxIter = 30, maxInner = 500,
+            pphi=pphir, rho=rhor,rho_vec_k=rho_vec_k,
+            kv=k_value, rhomat=rhomat, method=methodd
+          )
+
+
+      # res_iter <- switch (method,
+      #   'exc' = marcox_iter_excCpp(
+      #     betainit_origin,X1, betainit, Lambda, c1, W1, id, new_uid, n,
+      #     tol = 1e-6, maxIter = 30, maxInner = 500,
+      #     pphi=pphir, rho=rhor
+      #   ),
+      #   'ar1'=marcox_iter_ar1Cpp(
+      #     betainit_origin,X1, betainit, Lambda, c1, W1, id, new_uid, n,
+      #     tol = 1e-6, maxIter = 30, maxInner = 500,
+      #     pphi=pphir, rho=rhor
+      #   ),
+      #   'toep'=marcox_iter_kdCpp(
+      #     betainit_origin,X1, betainit, Lambda, c1, W1, id, new_uid, n,
+      #     tol = 1e-6, maxIter = 30, maxInner = 500,
+      #     pphi=pphir, rho=rhor,kv=max(n)-1,rhomat
+      #   ),
+      #   'kd'=marcox_iter_kdCpp(
+      #     betainit_origin,X1, betainit, Lambda, c1, W1, id, new_uid, n,
+      #     tol = 1e-6, maxIter = 30, maxInner = 500,
+      #     pphi=pphir, rho=rhor, kv=k_value,rhomat,Kn
+      #   ),
+      #   'uns'=marcox_iter_unsCpp(
+      #     betainit_origin,X1, betainit, Lambda, c1, W1, id, new_uid, n,
+      #     tol = 1e-6, maxIter = 30, maxInner = 500,
+      #     pphi=pphir, rho=rhor
+      #   ),
+      #   'indp'=marcox_iter_indpCpp(
+      #     betainit_origin,X1, betainit, Lambda, c1, W1, id, new_uid, n,
+      #     tol = 1e-6, maxIter = 30, maxInner = 500,
+      #     pphi=pphir, rho=rhor
+      #   ),
+      #   stop('Invalid method for correlation structure')
+      # )
 
       betainit <- as.matrix(res_iter$betainit)
       mu       <- as.matrix(res_iter$mu)
       rhor      <- res_iter$rho
       pphir     <- res_iter$pphi
       SK1      <- res_iter$SK1
+      rhomat <- res_iter$rhomat
+      clusteridx <- res_iter$clusteridx
 
-
-      if (any(abs(betainit-beta2)>0.000001) || any(abs(gSS1-gSSS1)>0.000001) )
+      if (any(abs(betainit-beta2)>1e-6) || any(abs(gSS1-gSSS1)>1e-6) )
       {
         beta2<-betainit
         gSSS1<-gSS1
@@ -319,13 +344,27 @@ marcox<-function(formula,dat,method='exc',k_value=1){
       else  break
     }
 
+if(abs(max(betainit)) > 5){
+  stop('Incompatible method for the dataset, or coefficient may be infinite.')
+}
+
+# nn=max(n)
+# rhomat=diag(0,max(n));
+# if(method=='exc'){
+#   rhomat=matrix(rhor,nn,nn)
+#   for(i in 1:nn){
+#     rhomat[i,i]=1
+#   }
+# } else if (method=='ar1'){
+#   for(i in 1:nn){
+#     for(j in 1:nn){
+#       rhomat[i,j]=rhor^(abs(i-j))
+#     }
+#   }
+# }
 
 
-
-
-
-
-
+  # rho=rhor
   # betacorr<-rho
   # betascale<-1
   # be<-betainit
@@ -455,7 +494,7 @@ marcox<-function(formula,dat,method='exc',k_value=1){
   # V1<-diag(vcmR)[1:covnum]
   # #V2<-(diag(solve(M)))[1:dim(xxx)[2]]
   # sandv<<-V1
-  #naivv<<-V2
+  # #naivv<<-V2
 
 
 
@@ -474,22 +513,18 @@ marcox<-function(formula,dat,method='exc',k_value=1){
   tt1    <- as.numeric(tt1)
   gg1    <- as.numeric(gg1)
   Lambda <- as.numeric(Lambda)
+  clusteridx <- as.numeric(clusteridx)
+  k_value <- as.numeric(k_value)
+  # rhomat <- as.matrix(rhomat)
+  # Q1R <- as.matrix(Q1R)
+  Q1R <- matSolCpp( rhomat,
+                    TRUE,
+                    K,
+                    n,
+                    1e3 )
 
-
-  sandv <- switch (method,
-                      'exc' = sandwich_exc_rcpp(rhor, 1, betainit, gSS, kk, covnum, K, n, new_uid,
-                                                xxx, c1, t2, tt1, gg1, Lambda, id),
-                      'ar1'= sandwich_ar1_rcpp(rhor, 1, betainit, gSS, kk, covnum, K, n, new_uid,
-                                               xxx, c1, t2, tt1, gg1, Lambda, id),
-                      'toep'=sandwich_toep_rcpp(rhor, 1, betainit, gSS, kk, covnum, K, n, new_uid,
-                                               xxx, c1, t2, tt1, gg1, Lambda, id),
-                      'kd'=sandwich_kd_rcpp(rhor, 1, betainit, gSS, kk, covnum, K, n, new_uid,
-                                             xxx, c1, t2, tt1, gg1, Lambda, id, k_value),
-                      'uns'=sandwich_uns_rcpp(rhor, 1, betainit, gSS, kk, covnum, K, n, new_uid,
-                                              xxx, c1, t2, tt1, gg1, Lambda, id),
-                      'indp'=sandwich_indp_rcpp(rhor, 1, betainit, gSS, kk, covnum, K, n, new_uid,
-                                               xxx, c1, t2, tt1, gg1, Lambda, id),
-                      stop('Invalid method for correlation structure'))
+  sandv <- se_cpp(clusteridx,1, betainit, gSS, kk, covnum, K, n, new_uid,
+                            xxx, c1, t2, tt1, gg1, Lambda, id ,rhomat,Q1R,k_value)
 
   z=betainit/sqrt(sandv)
   p_value = 2 * (1 - pnorm(abs(z)))
@@ -517,7 +552,8 @@ marcox<-function(formula,dat,method='exc',k_value=1){
   marcox_result <- list(
     Call = match.call(),
     Estimation = result,
-    correlation = rhor
+      correlation = rhor
+
   )
   return(marcox_result)
 

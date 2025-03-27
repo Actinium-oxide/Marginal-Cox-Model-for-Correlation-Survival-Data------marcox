@@ -1,5 +1,6 @@
 #ifdef __GNUC__
 #pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wattributes"
 #pragma GCC diagnostic ignored "-Wignored-attributes"
 #endif
 #include <RcppEigen.h>
@@ -17,7 +18,8 @@ SEXP matSolCpp(const Eigen::Map<Eigen::MatrixXd> & mat,
                const double tol_cond);
 
 // [[Rcpp::export]]
-SEXP sandwich_exc_rcpp(double rho,
+SEXP se_cpp(
+                   const Eigen::Map<Eigen::VectorXd> &clusteridx,
                    double betascale,
                    const Eigen::Map<Eigen::VectorXd> &betainit,
                    const Eigen::Map<Eigen::VectorXd> &gSS,
@@ -32,7 +34,11 @@ SEXP sandwich_exc_rcpp(double rho,
                    const Eigen::Map<Eigen::VectorXd> &tt1,
                    const Eigen::Map<Eigen::VectorXd> &gg1,
                    const Eigen::Map<Eigen::VectorXd> &Lambda,
-                   const IntegerVector &id)
+                   const IntegerVector &id,
+                   const Eigen::Map<Eigen::MatrixXd> &rhomat,
+                   const Eigen::Map<Eigen::MatrixXd> &Q1R,
+                   const int kv
+                   )
 {
   VectorXd gS(kk);
   gS[0] = gSS[0];
@@ -54,12 +60,8 @@ SEXP sandwich_exc_rcpp(double rho,
     for(int w=0; w<covnum; w++){
       for(int i_clust=0; i_clust<K; i_clust++){
         int ni = n[i_clust];
-        MatrixXd Q1 = MatrixXd::Constant(ni, ni, rho);
-        for(int d=0; d<ni; d++){
-          Q1(d,d) = 1.0;
-        }
-        SEXP ret = matSolCpp(Map<MatrixXd>(Q1.data(), Q1.rows(), Q1.cols()),false,K,n,1e3);
-        Map<MatrixXd> IQ1(REAL(ret), Q1.rows(), Q1.cols());
+        int idxx = static_cast<int>(clusteridx[i_clust]);
+        MatrixXd IQ1 = Q1R.block(idxx,idxx,ni,ni);
         std::vector<int> idx;
         for(int r=0; r<Kn; r++){
           if(id[r]==new_uid[i_clust]) idx.push_back(r);
@@ -90,6 +92,7 @@ SEXP sandwich_exc_rcpp(double rho,
           }
         }
         MatrixXd BB1 = outer_mat.array()*IQ1.array();
+
         MatrixXd B2 = MatrixXd::Zero(ni, ni);
         for(int s_i=0; s_i<ni; s_i++){
           for(int l=0; l<ni; l++){
@@ -115,7 +118,6 @@ SEXP sandwich_exc_rcpp(double rho,
       for(int i=0; i<K; i++){
         sumVal += ABC1[i];
       }
-      VA1(v,w) = sumVal/betainit[0];
       VA1(v,w) = sumVal/betascale;
       ABC1.setZero();
     }
@@ -184,12 +186,8 @@ SEXP sandwich_exc_rcpp(double rho,
           colr[sub] = xxx(idx[sub], r);
           t21[sub] = t2[idx[sub]];
         }
-        MatrixXd Q1 = MatrixXd::Constant(ni, ni, rho);
-        for(int d=0; d<ni; d++){
-          Q1(d,d)=1.0;
-        }
-        SEXP ret2 = matSolCpp(Map<MatrixXd>(Q1.data(),Q1.rows(),Q1.cols()),false,K,n,1e3);
-        Map<MatrixXd> IQ1(REAL(ret2), ni, ni);
+        int idxx = static_cast<int>(clusteridx[i_clust]);
+        MatrixXd IQ1 = Q1R.block(idxx,idxx,ni,ni);
         for(int j_idx=0; j_idx<ni; j_idx++){
           if(t21[j_idx]>=tt1[s]){
             double sum_val=0.0;
@@ -197,6 +195,7 @@ SEXP sandwich_exc_rcpp(double rho,
             for(int k=0; k<ni; k++){
               double sqrt_k = (mu22[k]>1e-15)?std::sqrt(mu22[k]):0.0;
               sum_val += colr[k]*sqrt_k*inv_sqrt_j*IQ1(k,j_idx);
+
             }
             elem += sum_val*mu22[j_idx]/betascale;
           }
@@ -243,10 +242,8 @@ SEXP sandwich_exc_rcpp(double rho,
     for(int r=0; r<ni; r++){
       C2_cluster[r] = c22[r]/g11[r]-mu22cl[r];
     }
-    MatrixXd Q1 = MatrixXd::Constant(ni, ni, rho);
-    for(int d=0; d<ni; d++){
-      Q1(d,d)=1.0;
-    }
+    int idxx = clusteridx[i_clust];
+    MatrixXd Q1 = rhomat.block(idxx,idxx,ni,ni);
     VectorXd sqrt_mu22cl(ni);
     for(int r=0; r<ni; r++){
       sqrt_mu22cl[r] = std::sqrt(mu22cl[r]);

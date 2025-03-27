@@ -11,7 +11,8 @@ Description: Estimation of marginal hazard ratios in clustered failure time data
 Depends: R (>= 4.4.0), Matrix
 Imports:
     Rcpp,
-    RcppEigen
+    RcppEigen,
+    survival
 LinkingTo:
     Rcpp,
     RcppEigen

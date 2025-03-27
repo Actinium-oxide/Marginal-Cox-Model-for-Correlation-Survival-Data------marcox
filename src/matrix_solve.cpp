@@ -1,5 +1,6 @@
 #ifdef __GNUC__
 #pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wattributes"
 #pragma GCC diagnostic ignored "-Wignored-attributes"
 #endif
 #include <RcppEigen.h>
@@ -36,7 +37,7 @@ static Eigen::MatrixXd blockInverseChol(const Eigen::MatrixXd &block, double reg
   }
 }
 
-static Eigen::MatrixXd safeInverse(const Eigen::MatrixXd &M, double reg = 1e-6, double tol_cond = 1e3) {
+static Eigen::MatrixXd safeInverse(const Eigen::MatrixXd &M, double reg = 1e-6, double tol_cond = 1e3){
   Eigen::JacobiSVD<MatrixXd> svd(M, ComputeThinU | ComputeThinV);
   double min_sv = svd.singularValues().tail(1)(0);
   double max_sv = svd.singularValues()(0);
@@ -58,7 +59,7 @@ static Eigen::MatrixXd safeInverse(const Eigen::MatrixXd &M, double reg = 1e-6, 
   }
 }
 // [[Rcpp::export]]
-SEXP matSolCpp(const Eigen::Map<Eigen::MatrixXd> & mat,
+SEXP matSolCpp(const Eigen::Map<Eigen::MatrixXd> &mat,
                const bool block,
                const int K,
                const IntegerVector &n,
