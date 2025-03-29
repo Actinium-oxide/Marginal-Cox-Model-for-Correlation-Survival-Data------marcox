@@ -24,7 +24,8 @@
 #' If categorical variables (e.g., \code{type}) are included, they should be passed as strings when using \code{factormar()}.
 #'
 #' Generally, binary covariates should not be converted into dummy variables using \code{factormar()}, as this may introduce unexpected errors.
-
+#' @noRd
+#'
 factormar <- function(typename, d_v = NULL,cluster22) {
   col_num<-dim(cluster22)[2]
   #if (col_num != dim(cluster22)[2]) { cluster22 <- cluster2_backup }

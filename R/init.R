@@ -11,6 +11,7 @@
 #' @param sep parameter. The \code{sep} parameter specifies the character that separates
 #' the fields in each line of the file. For instance, for a comma-separated file, set \code{sep = ","},
 #' and for a tab-separated file, set \code{sep = "\t"}.
+#' @param col_id Character. The name of column that identifies the clusters.
 #' If the data has complex observational situations, please preprocess the data before using this function.
 #' @return A list containing:
 #' \itemize{
@@ -30,24 +31,24 @@
 #' # Use an existing data frame without specifying div
 #' sample_data_1 <- kidney_data
 #' init(sample_data_1,div=2)
-init <- function(ad,sep='\t',div=NULL){
+init <- function(ad,sep='\t',col_id='id',div=NULL){
   if(typeof(ad)=='character'){
     cluster2 <- read.table(ad,header=T,sep=sep)
 
 }
   else {cluster2<-ad}
-  col_name_origin=colnames(cluster2)
+  #col_name_origin=colnames(cluster2)
 
 
   if(is.null(div)==FALSE){
-  if (dim(cluster2)[1]%%div!=0){ warning ('ERROR IN DIVISION')}
+  if (dim(cluster2)[1]%%div!=0){ stop ('ERROR IN DIVISION')}
 
   else{
     id<-NULL
     l<-dim(cluster2)[1]
     col_n<-dim(cluster2)[2]+1
-    cluster2$id <- rep(1:l,each=div,length.out=(l%/%div)*div)
-    id<-cluster2$id
+    cluster2[,col_id] <- rep(1:l,each=div,length.out=(l%/%div)*div)
+    id<-cluster2[,col_id]
     cluster2[,'original_id'] <- id
     col_num<-dim(cluster2)[2]
     cluster2_backup<-cluster2
@@ -65,18 +66,19 @@ init <- function(ad,sep='\t',div=NULL){
         }
       }
     }
-    cluster2$id <- newid
+    cluster2[,col_id] <- newid
 
 
   }
   }
   else{
-    id<-cluster2$id
+    id<-cluster2[,col_id]
     cluster2[,'original_id'] <- id
     col_num<-dim(cluster2)[2]
     cluster2_backup<-cluster2
   }
 
-  cluster2<-cluster2[order(cluster2$id),]
-  return(list(cluster2,col_name_origin))
+  cluster2<-cluster2[order(cluster2[,col_id]),]
+  colnames(cluster2)[which(colnames(cluster2)==col_id)] <- 'id'
+  return(cluster2)
 }
