@@ -29,14 +29,13 @@ List marcox_iter_Cpp(
     const IntegerVector               &new_uid,
     const IntegerVector               &n,
     const float &tol ,
-    const short &maxIter ,
-    const short &maxInner,
     double pphi,
     double rho,
     Eigen::Map<Eigen::VectorXd> rho_vec_k,
     const int &kv,
     Eigen::Map<Eigen::MatrixXd> rhomat,
-    const short &method
+    const short &method,
+    int SK1
 
 ){
 
@@ -63,11 +62,10 @@ List marcox_iter_Cpp(
   }
 
 
-  int SK1 = 1;
   VectorXd beta1_local = VectorXd::Zero(X1.cols());
 
 
-  for(; SK1 <= maxIter; SK1++){
+  while(true){
 
     bool outerBreak = false;
     while(true){
@@ -101,7 +99,7 @@ List marcox_iter_Cpp(
       // exchangeable & ar1 rho iter
       else if (method==0 || method==1 ){
         for(int i=0; i<K; i++){
-        int idx=clusteridx[i];
+        //int idx=clusteridx[i];
         std::vector<double> groupRes;
 
         int cluster_id = new_uid[i];
@@ -207,8 +205,8 @@ List marcox_iter_Cpp(
           else
             rho_est = 0.0;
 
-          if (rho_est < 0.0) {
-            rho_vec_k[m - 1] = 0.0;
+          if (rho_est < -1.0) {
+            rho_vec_k[m - 1] = -1.0;
           } else if (rho_est > 1.0) {
             rho_vec_k[m - 1] = 1.0;
           } else {
@@ -249,24 +247,21 @@ List marcox_iter_Cpp(
               groupRes.push_back(res[row]);
             }
           }
-          for(int p = 0; p < ni; p++){
-            for(int q = p + 1; q < ni; q++){
+          for(int r = 0; r < ni; r++){
+            for(int q = r + 1; q < ni; q++){
 
 
-              double rres    = groupRes[p] * groupRes[q];
+              double rres    = groupRes[r] * groupRes[q];
               double denom   = K-p;
               double rho_est = 0.0;
 
-              if(denom > 0.0) {
+
                 rho_est = (1.0 / pphi) * (rres / denom);
-              } else {
-                rho_est = 0.0;
-              }
-              if(rho_est < 0.0) rho_est = 0.0;
+              if(rho_est < -1.0) rho_est = -1.0;
               if(rho_est > 1.0) rho_est = 1.0;
 
-              rhomat(idx + p, idx + q) = rho_est;
-              rhomat(idx + q, idx + p) = rho_est;
+              rhomat(idx + r, idx + q) = rho_est;
+              rhomat(idx + q, idx + r) = rho_est;
             }
           }
         }
@@ -382,10 +377,15 @@ List marcox_iter_Cpp(
 
         VectorXd diff = geebeta - betainit;
         double maxDiff = diff.cwiseAbs().maxCoeff();
-        if(maxDiff > tol && SK <= maxInner) {
+        if(maxDiff > tol && SK <= 1000) {
 
           betainit = geebeta;
           //std::cout <<  betainit.transpose() << std::endl;
+
+          double divergence = betainit.cwiseAbs().maxCoeff();
+          if(divergence > 5.0 || divergence < -3){
+            Rcpp::stop("Ran out of iterations and did not converge");
+          }
 
           for(int i=0; i<Kn; i++){
             double val=0.0;
@@ -403,8 +403,9 @@ List marcox_iter_Cpp(
 
       VectorXd diff2 = betainit - beta1_local;
       double md2 = diff2.cwiseAbs().maxCoeff();
-      if(md2>tol && SK1 < maxIter){
+      if(md2>tol && SK1 < 30){
         beta1_local = betainit;
+        SK1++;
       } else {
 
         outerBreak = true;
