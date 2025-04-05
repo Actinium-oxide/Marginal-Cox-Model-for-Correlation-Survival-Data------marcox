@@ -4,37 +4,60 @@
 \alias{marcox}
 \title{Analysis for Cox Proportional Hazards Models}
 \usage{
-marcox(formula, dat, method = "exc")
+marcox(
+  formula,
+  data,
+  sep = NULL,
+  method = "exchangeable",
+  col_id = "id",
+  div = NULL,
+  k_value = 1,
+  plot_x = NULL,
+  x_axis = "Time",
+  y_axis = "Survival Rates",
+  size = 0.5,
+  diagnose = FALSE
+)
 }
 \arguments{
 \item{formula}{A model formula that uses the \code{Surv()} function to define the survival outcome. It should include
 both continuous and categorical covariates, where categorical variables must be specified using the \code{factormar()} function.}
 
-\item{dat}{A list containing the dataset as prepared by the \code{init()} function. This list must include the processed data frame
-and original column names to ensure proper matching of variables.}
+\item{data}{The file path or the dataset(matrix) to be analyzed. If a file path is provided, the file will be loaded into a matrix.
+The file should be in a tabular format (e.g., .csv, .txt).}
+
+\item{sep}{Character. The \code{sep} parameter specifies the character that separates
+the fields in each line of the file. For instance, for a comma-separated file, set \code{sep = ","},
+and for a tab-separated file, set \code{sep = "\t"}.}
 
 \item{method}{The method employed to solve the correlation coefficient:
 \itemize{
-\item Exchangeable correlation structure: \code{method = 'exc'}
+\item Exchangeable correlation structure: \code{method = 'exchangeable'}<\if{html}{\out{<Default>}}>
 \item Autoregressive(AR-1): \code{method = 'ar1'}
-\item k-dependent: \code{method = 'kd'}
-\item Toeplitz: \code{method = 'toep'}
-\item Independent: \code{method = 'indp'}
-\item Unstructured: \code{method = 'uns'}
+\item k-dependent: \code{method = 'kdependent'}
+\item Toeplitz: \code{method = 'toeplitz'}
+\item Independent: \code{method = 'independent'}
+\item Unstructured: \code{method = 'unstructured'}
 }}
+
+\item{col_id}{Character. The name of column that identifies the clusters.}
+
+\item{div}{Integer. The number of observation points per sample. If provided, the data will be divided accordingly.
+If the data has complex observational situations, please preprocess the data before using this function.}
+
+\item{k_value}{The k value only for k-dependent structure. The default value is 1.}
+
+\item{diagnose}{Diagnose option.}
 }
 \value{
-A data frame containing the following components:
+A list containing the following components:
 \itemize{
-
-\if{html}{\out{<div class="sourceCode">}}\preformatted{  \\item \code{coef} - The estimated regression coefficients.
-  \\item \code{exp(coef)} - The exponentiated coefficients (hazard ratios).
-  \\item \code{se(coef)} - The standard errors of the estimated coefficients.
-  \\item \code{z} - The z-statistics for testing the significance of the coefficients.
-  \\item \code{p} - The p-values associated with the coefficients.
-  \\item \code{Correlation]} - The correlation coefficient of the data.
-}\if{html}{\out{</div>}}
-
+\item \code{coef} - The estimated regression coefficients.
+\item \code{exp(coef)} - The exponentiated coefficients (hazard ratios).
+\item \code{se(coef)} - The standard errors of the estimated coefficients.
+\item \code{z} - The z-statistics for testing the significance of the coefficients.
+\item \code{p} - The p-values associated with the coefficients.
+\item (hidden).correlation - Correlation coefficients of the data.
 }
 }
 \description{
@@ -47,8 +70,6 @@ The \code{marcox()} function is specifically designed for survival data analysis
 The survival outcome must be defined using the \code{Surv()} function in the model formula, and covariates can be included directly or by converting categorical variables with the \code{factormar()} function.
 }
 \examples{
-  dat <- init(kidney_data, div = 2)
   formula <- Surv(time, cens) ~ sex + factormar('type', d_v=c(1,2,3))
-  result1 <- marcox(formula, dat, method = 'exc')
-  print(result1)
+  marcox(formula, data = kidney_data, div = 2, method = 'exchangeable', plot = TRUE, plot_x = 'sex')
 }
