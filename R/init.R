@@ -17,9 +17,8 @@
 #' \itemize{
 #'   \item \code{cluster2} - The processed data frame after applying any transformations, including the addition of unique IDs.
 #'   \item \code{dv} - A list of dummy variables. If no dummy variables are created, returns an empty list.
-#'   \item \code{col_name_origin} - The original column names of the data frame.
 #' }
-#' @export
+#' @noRd
 #' @importFrom utils read.table
 #' @details
 #' This function is generally used as a preparatory step for the \code{marcox} function.

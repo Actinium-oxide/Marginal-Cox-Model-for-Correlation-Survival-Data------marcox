@@ -6,8 +6,14 @@
 #'
 #' @param formula A model formula that uses the \code{Surv()} function to define the survival outcome. It should include
 #' both continuous and categorical covariates, where categorical variables must be specified using the \code{factormar()} function.
-#' @param dat A list containing the dataset as prepared by the \code{init()} function. This list must include the processed data frame
-#' and original column names to ensure proper matching of variables.
+#' @param data The file path or the dataset(matrix) to be analyzed. If a file path is provided, the file will be loaded into a matrix.
+#' The file should be in a tabular format (e.g., .csv, .txt).
+#' @param sep parameter. The \code{sep} parameter specifies the character that separates
+#' the fields in each line of the file. For instance, for a comma-separated file, set \code{sep = ","},
+#' and for a tab-separated file, set \code{sep = "\t"}.
+#' @param col_id Character. The name of column that identifies the clusters.
+#' @param div Integer. The number of observation points per sample. If provided, the data will be divided accordingly.
+#' If the data has complex observational situations, please preprocess the data before using this function.
 #' @param method The method employed to solve the correlation coefficient:
 #' \itemize{
 #'     \item Exchangeable correlation structure: \code{method = 'exc'}<<Default>>
@@ -18,8 +24,7 @@
 #'     \item Unstructured: \code{method = 'uns'}
 #'     }
 #' @param k_value The k value only for k-dependent structure. The default value is 1.
-#'
-#' @useDynLib marcox, .registration = TRUE
+#' @param diagnose Diagnose option.
 #' @importFrom Rcpp evalCpp
 #' @importFrom stats pchisq
 #' @import RcppEigen
@@ -33,21 +38,19 @@
 #'       \item \code{se(coef)} - The standard errors of the estimated coefficients.
 #'       \item \code{z} - The z-statistics for testing the significance of the coefficients.
 #'       \item \code{p} - The p-values associated with the coefficients.
-#'       \item \code{correlation]} - correlation coefficients of the data.
+#'       \item (hidden).correlation - correlation coefficients of the data.
 #'
 #' }
 #' @details
 #' The \code{marcox()} function is specifically designed for survival data analysis using Cox proportional hazards models. It handles both clustered and time-dependent covariates effectively.
 #' The survival outcome must be defined using the \code{Surv()} function in the model formula, and covariates can be included directly or by converting categorical variables with the \code{factormar()} function.
-#' @importFrom utils getFromNamespace
 #' @examples
-#'   dat <- init(kidney_data, div = 2)
 #'   formula <- Surv(time, cens) ~ sex + factormar('type', d_v=c(1,2,3))
-#'   result1 <- marcox.fit(formula, dat, method = 'exc')
-#'   print(result1)
+#'   marcox(formula, data = kidney_data, div = 2, method = 'exc')
 #' @noRd
 #'
-marcox.fit<-function(formula,dat,method='exc',k_value=1){
+marcox.fit<-function(formula,data,sep,col_id,div,method,k_value,diagnose,iteration){
+  dat <- init(data,sep,col_id,div)
   cluster2<-dat
   col_num<-dim(cluster2)[2]
   new_id<-cluster2$id
@@ -59,8 +62,8 @@ marcox.fit<-function(formula,dat,method='exc',k_value=1){
       for(i in 1:K){
         n[i]<- sum(id==new_uid[i])
       }
-      if(k_value>=max(n) && method=='kd'){
-        warning('Invalid k-value for method "kd". Try "method = toep". ')
+      if(k_value>=max(n) && method=='kdependent'){
+        warning('Invalid k-value for method "kdependent". Try "method = toeplitz". ')
       }
       t2<-cluster2[,as.character(formula[[2]][[2]])]
       c1<-cluster2[,as.character(formula[[2]][[3]])]
@@ -108,17 +111,17 @@ marcox.fit<-function(formula,dat,method='exc',k_value=1){
             para=substring(para,first = 2,last = nchar(para)-2)
             factorls=list(typename=para,cluster22=cluster2)
           }
-          factormar_function <- getFromNamespace("factormar", "marcox")
-          tm=do.call(factormar_function,factorls)
+          # factormar_function <- getFromNamespace("factormar", "marcox")
+          tm=do.call(factormar,factorls)
           #tm=eval(parse(text=j))
           tm_1=tm[[1]]
           typelist<-c(typelist,tm_1[1])
           typedumlist<-c(typedumlist,tm_1[2:length(tm_1)])
 
-          tm_2 <- do.call(factormar_function,factorls)[[2]]
+          tm_2 <- tm[[2]]
           xxx_21<-cbind(xxx_21,tm_2)
         }}
-      xxx_21=xxx_21[,-1]
+          xxx_21=xxx_21[,-1]
       # for (i in index){
       #   if(grepl('factormar',i)==TRUE){
       #     tm_2=eval(parse(text=i))[[2]]
@@ -150,23 +153,29 @@ marcox.fit<-function(formula,dat,method='exc',k_value=1){
       SK1<-1
       X1<-xxx
       Kn_ls<-1:Kn
-      rhomat <- diag(1,Kn);
+      rhomat <- diag(1,Kn)
       # if(is.null(typelist)){
       # betainit_origin <- as.matrix(survival::coxph(update(formula,.~.+cluster(id)),dat)$coef)
       # }
-      betainit_origin <- rep(0,dim(xxx)[2])
-      betainit <- betainit_origin
-      # betainit<-matrix(rep(0,dim(xxx)[2]),ncol=1)
+      betainit<-matrix(rep(0,dim(xxx)[2]),ncol=1)
+      betainit_origin <- betainit
 
       methodd <- switch (method,
-                         'exc' = 0,
+                         'exchangeable' = 0,
                          'ar1'=1,
-                         'toep'=2,
-                         'kd'=3,
-                         'uns'=4,
-                         'indp'=5,
+                         'toeplitz'=2,
+                         'kdependent'=3,
+                         'unstructured'=4,
+                         'independent'=5,
                          stop('Invalid method for correlation structure')
       )
+      iter <- switch (iteration,
+        'newton_raphson' = 0,
+        'nr' = 0,
+        'two_step' = 1,
+        'ts' = 1
+      )
+
       if(methodd==2){k_value=max(n)-1}
       rho_vec_k=rep(0,k_value)
 
@@ -190,7 +199,7 @@ marcox.fit<-function(formula,dat,method='exc',k_value=1){
       if(t2[i]<tt1[1])
       {
         gSS2[i]=1
-        gSS3[i]=0.00000001
+        gSS3[i]=1e-6
       }
       else {
         if(t2[i]>=tt1[kk])
@@ -218,7 +227,7 @@ marcox.fit<-function(formula,dat,method='exc',k_value=1){
       #   newY1<<-c1/Lambda
       #   res<<-as.vector((newY1-mu)/sqrt(mu))
       #   rres=0
-      #   pphi<<-(sum(res^2)/(sum(n)-dim(X1)[2]))
+      #   pphi<<-(sum(res^2)/(Kn-dim(X1)[2]))
       #   for(i in 1:K) {
       #     group_res <- res[id == new_uid[i]]
       #     ni <- length(group_res)
@@ -239,7 +248,7 @@ marcox.fit<-function(formula,dat,method='exc',k_value=1){
       #     for(i in 1:K){
       #       id_eq=which(id==new_uid[i])
       #       mu_gp=as.matrix(mu[id_eq])
-      #       D1[temp2:(temp2+n[i]-1),]<<-diag(as.vector(mu_gp)+1e-6)%*%diag(rep(1,n[i]))%*%(X1[id==new_uid[i],])
+      #       D1[temp2:(temp2+n[i]-1),]<<-diag(as.vector(mu_gp))%*%diag(rep(1,n[i]))%*%(X1[id==new_uid[i],])
       #       temp2=temp2+n[i]
       #     }
       #
@@ -285,69 +294,136 @@ marcox.fit<-function(formula,dat,method='exc',k_value=1){
 
 
 
-
-      res_iter <- marcox_iter_Cpp(
-            betainit_origin,X1, betainit, Lambda, c1, W1, id, new_uid, n,
+if(methodd%in%c(0,1,5)){
+      res_iter <- marcox_iter_Cpp_eai(
+            X1, betainit, Lambda, c1, W1, id, new_uid, n,
             tol = 1e-6,
             pphi=pphir, rho=rhor,rho_vec_k=rho_vec_k,
-            kv=k_value, rhomat=rhomat, method=methodd,SK1=SK1
-          )
-
-
-      # res_iter <- switch (method,
-      #   'exc' = marcox_iter_excCpp(
-      #     betainit_origin,X1, betainit, Lambda, c1, W1, id, new_uid, n,
-      #     tol = 1e-6, maxIter = 30, maxInner = 500,
-      #     pphi=pphir, rho=rhor
-      #   ),
-      #   'ar1'=marcox_iter_ar1Cpp(
-      #     betainit_origin,X1, betainit, Lambda, c1, W1, id, new_uid, n,
-      #     tol = 1e-6, maxIter = 30, maxInner = 500,
-      #     pphi=pphir, rho=rhor
-      #   ),
-      #   'toep'=marcox_iter_kdCpp(
-      #     betainit_origin,X1, betainit, Lambda, c1, W1, id, new_uid, n,
-      #     tol = 1e-6, maxIter = 30, maxInner = 500,
-      #     pphi=pphir, rho=rhor,kv=max(n)-1,rhomat
-      #   ),
-      #   'kd'=marcox_iter_kdCpp(
-      #     betainit_origin,X1, betainit, Lambda, c1, W1, id, new_uid, n,
-      #     tol = 1e-6, maxIter = 30, maxInner = 500,
-      #     pphi=pphir, rho=rhor, kv=k_value,rhomat,Kn
-      #   ),
-      #   'uns'=marcox_iter_unsCpp(
-      #     betainit_origin,X1, betainit, Lambda, c1, W1, id, new_uid, n,
-      #     tol = 1e-6, maxIter = 30, maxInner = 500,
-      #     pphi=pphir, rho=rhor
-      #   ),
-      #   'indp'=marcox_iter_indpCpp(
-      #     betainit_origin,X1, betainit, Lambda, c1, W1, id, new_uid, n,
-      #     tol = 1e-6, maxIter = 30, maxInner = 500,
-      #     pphi=pphir, rho=rhor
-      #   ),
-      #   stop('Invalid method for correlation structure')
-      # )
+            kv=k_value, rhomat=rhomat, method=methodd,SK1=SK1,diag=diagnose
+      )
+      }
+      else if(methodd %in%c(2,3,4)){
+        if(iter==1){
+        res_iter <- marcox_iter_Cpp_ktu(
+          X1, betainit, Lambda, c1, W1, id, new_uid, n,pphir,rho_vec_k,
+          k_value,rhomat,1e-6,30,methodd,diagnose
+        )
+        }
+        else if(iter==0){
+          res_iter <- marcox_iter_Cpp_eai(
+            X1, betainit, Lambda, c1, W1, id, new_uid, n,1e-6,pphir,rhor,rho_vec_k,
+            k_value,rhomat,methodd,SK1,diagnose)
+        }
+      }
 
       betainit <- as.matrix(res_iter$betainit)
       mu       <- as.matrix(res_iter$mu)
       rhor      <- res_iter$rho
       pphir     <- res_iter$pphi
       rho_vec_k <- res_iter$rho_vec_k
-      SK1      <- res_iter$SK1
       rhomat <- res_iter$rhomat
       clusteridx <- res_iter$clusteridx
+      diverge <- res_iter$diverge
 
+
+      if(diverge){
       if (any(abs(betainit-beta2)>1e-6) || any(abs(gSS1-gSSS1)>1e-6) )
       {
         beta2<-betainit
         gSSS1<-gSS1
       }
       else  break
+      }else break
     }
 
-if(abs(max(betainit)) > 5){
-  warning('Incompatible method for the dataset, or coefficient may be infinite.')
-}
+      # if(diverge==FALSE){
+      #   stop("Ran out of iteration and did not converge.")
+      #
+      #   methodd <- 0
+      #   betainit <- betainit_origin
+      #   gSS <- rep(1,kk)
+      #   gSS1 <- rep(1,kk)
+      #   gSS2<-rep(0,Kn)
+      #   gSS3<-rep(0,Kn)
+      #   gSSS1<-rep(0,kk)
+      #   Lambda<-gSS3
+      #   W1<-diag(Lambda)
+      #   SK1 <- 1
+      #   pphir <- 1
+      #   rhor <- 0
+      #   rhomat <- diag(1,Kn)
+      #   rho_vec_k <- rep(0,k_value)
+      #
+      #   repeat{
+      #     gSS1 <- rep(1,kk)
+      #     temp1<-sum(g11[min((1:(Kn))[t11==tt1[1]]):(Kn)]*
+      #                  exp(x111[(min((1:(Kn))[t11==tt1[1]]):(Kn)),]%*%betainit))
+      #     gSS <- rep(1,kk)
+      #     gSS[1]<-dd[1]/temp1
+      #     for (i in 1:(kk-1))
+      #     {
+      #       gSS[i+1]<-gSS[i]+dd[i+1]/(sum(g11[min((1:(Kn))[t11==tt1[i+1]]):(Kn)]*
+      #                                       exp(x111[min((1:(Kn))[t11==tt1[i+1]]):(Kn),]%*%betainit)))
+      #     }
+      #
+      #     gSS1<-exp(-gSS)
+      #     gSS2<-rep(0,Kn)
+      #     gSS3<-rep(0,Kn)
+      #     for(i in 1:(Kn))
+      #     {  kk1=1
+      #     if(t2[i]<tt1[1])
+      #     {
+      #       gSS2[i]=1
+      #       gSS3[i]=1e-6
+      #     }
+      #     else {
+      #       if(t2[i]>=tt1[kk])
+      #       {
+      #         gSS2[i]=0
+      #         gSS3[i]=gSS[kk]
+      #       }
+      #       else {
+      #         repeat{
+      #           if(t2[i]>=tt1[kk1]) {kk1=kk1+1}
+      #           else break
+      #         }
+      #         { gSS2[i]=(gSS1[kk1-1])^(exp(xxx[i,]%*%betainit))
+      #           gSS3[i]=gSS[kk1-1]
+      #         }
+      #       }
+      #     }
+      #     }
+      #     Lambda<-gSS3
+      #     W1<-diag(Lambda)
+      #
+      #     beta1=matrix(rep(0,dim(xxx)[2]),ncol=1)
+      #
+      #     res_iter <- marcox_iter_Cpp(
+      #       X1, betainit, Lambda, c1, W1, id, new_uid, n,
+      #       tol = 1e-6,
+      #       pphi=pphir, rho=rhor,rho_vec_k=rho_vec_k,
+      #       kv=k_value, rhomat=rhomat, method=methodd,SK1=SK1,diag=diagnose
+      #     )
+      #
+      #     betainit <- as.matrix(res_iter$betainit)
+      #     mu       <- as.matrix(res_iter$mu)
+      #     rhor      <- res_iter$rho
+      #     pphir     <- res_iter$pphi
+      #     rho_vec_k <- res_iter$rho_vec_k
+      #     SK1      <- res_iter$SK1
+      #     rhomat <- res_iter$rhomat
+      #     clusteridx <- res_iter$clusteridx
+      #     diverge <- res_iter$diverge
+      #
+      #       if (any(abs(betainit-beta2)>1e-6) || any(abs(gSS1-gSSS1)>1e-6) )
+      #       {
+      #         beta2<-betainit
+      #         gSSS1<-gSS1
+      #       }
+      #       else  break
+      #
+      #   }
+      # }
 
 # nn=max(n)
 # rhomat=diag(0,max(n));
@@ -498,7 +574,7 @@ if(abs(max(betainit)) > 5){
   # #naivv<<-V2
 
 
-
+if(diverge){
   betainit <- as.numeric(betainit)
   gSS      <- as.numeric(gSS)
   kk       <- as.integer(kk)
@@ -577,6 +653,10 @@ if(abs(max(betainit)) > 5){
   #   )
   # }
   # return(marcox_result)
+}else{
+    stop('Ran out of iteration and did not convergent.
+         Wrong correlation structure or infinite coefficient.')
+  }
 
   ord <- order(t2)
   time   <- t11
@@ -607,7 +687,8 @@ if(abs(max(betainit)) > 5){
     cens0times=Kn-length(c1[which(c1==1)]),
     cov=cov_temp,
     dummylist=typedumlist,
-    mtd=methodd,
+    mtd=method,
+    mtdd=methodd,
     typelist=typelist,
     phi=pphir,
     LR=LR,
