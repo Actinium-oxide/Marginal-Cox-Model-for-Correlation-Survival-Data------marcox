@@ -4,3 +4,4 @@ The package implements a weighted estimating equation approach based on a semipa
 
 The package has functions to calculate coefficients, robust standard error and p-value in Cox proportional hazard model. The data simulation model is also supported for users to create simulated clustered data up to arguments entered (lambda, b1, censrate, K, n, dimension) which satisfies Cox distribution.
 
+This package is already available on CRAN: https://cran.r-project.org/web/packages/marcox/index.html. use "install.package('marcox')" and "library(marcox)" to install the package in R session.
